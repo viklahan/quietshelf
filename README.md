@@ -39,6 +39,35 @@ There is no paid AI provider in this codebase. Choose with `LLM_PROVIDER`:
 > request caps — far more than one creator needs, but if you hit a 429
 > ("the free AI tier needs a breather"), wait a minute and try again.
 
+## Run on NVIDIA Jetson (fully local, GPU-accelerated)
+
+Jetson devices (Orin, AGX, NX, Nano) can run the whole stack locally with no
+internet dependency. Ollama runs on the Jetson GPU; the qfc app talks to it
+over the Docker internal network.
+
+**Prerequisites:**
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on the Jetson host
+- Docker and Docker Compose installed
+- ~6 GB free storage for the model weights
+
+```bash
+git clone https://github.com/your-username/quiet-fight-club.git
+cd quiet-fight-club
+cp .env.jetson.example .env.jetson   # already configured for Ollama
+# Start Ollama first and pull the model (one-time, ~5 GB download):
+docker compose -f docker-compose.jetson.yml up -d ollama
+bash jetson-setup.sh
+# Then bring up the full stack:
+docker compose -f docker-compose.jetson.yml up -d
+```
+
+Open <http://localhost:8000>. Everything runs on-device — script text never
+leaves the Jetson.
+
+> **Model choice:** `llama3.1:8b` (default) runs well on Jetson Orin NX 8 GB+.
+> If you have an AGX Orin (16 GB+ VRAM), set `MODEL_NAME=llama3.1:70b` in
+> `.env.jetson` for significantly better output quality.
+
 ## Deploy to Render (free tier, also $0)
 
 1. Fork this repo on GitHub.

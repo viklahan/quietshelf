@@ -1,0 +1,57 @@
+/* ── Quiet Fight Club · Color tokens ─────────────────────────────
+   "A writer's desk at night": warm ink darkness, paper-cream text,
+   one ember accent (the lamp), one oxblood accent (the fight).     */
+
+:root {
+  /* Base palette — the six named values. Stay disciplined. */
+  --ink-950: #100d0a;   /* deepest shadow */
+  --ink-900: #15110d;   /* page background — warm ink, never pure black */
+  --ink-800: #1d1812;   /* card / surface charcoal */
+  --ink-700: #262017;   /* raised surface, hover fill */
+  --ink-600: #332b1f;   /* pressed fill, strong divider */
+
+  --paper-100: #ede4d3; /* primary text — paper cream */
+  --paper-200: #dccfb6; /* bright paper, emphasized text */
+  --paper-400: #a89b82; /* secondary / muted text */
+  --paper-600: #6e6452; /* faint text, placeholders */
+
+  --ember-400: #d9a458; /* lamplight hover */
+  --ember-500: #c5893b; /* the accent. used sparingly */
+  --ember-600: #9c6a26; /* pressed ember */
+
+  --oxblood-400: #a04437; /* error text on dark */
+  --oxblood-500: #7e2b23; /* the fight — destructive, error */
+  --oxblood-600: #611f19; /* pressed oxblood */
+
+  /* Edges — paper-tinted hairlines, never gray */
+  --edge-strong: rgba(237, 228, 211, 0.18);
+  --edge-soft:   rgba(237, 228, 211, 0.10);
+  --edge-faint:  rgba(237, 228, 211, 0.06);
+
+  /* Semantic aliases */
+  --bg-page:        var(--ink-900);
+  --bg-page-deep:   var(--ink-950);
+  --surface-card:   var(--ink-800);
+  --surface-raised: var(--ink-700);
+  --surface-pressed: var(--ink-600);
+
+  --text-body:   var(--paper-100);
+  --text-bright: var(--paper-200);
+  --text-muted:  var(--paper-400);
+  --text-faint:  var(--paper-600);
+
+  --accent:        var(--ember-500);
+  --accent-hover:  var(--ember-400);
+  --accent-press:  var(--ember-600);
+  --on-accent:     var(--ink-950);
+
+  --danger:       var(--oxblood-500);
+  --danger-text:  var(--oxblood-400);
+
+  --focus-ring: var(--ember-400);
+
+  /* Tinted washes */
+  --wash-ember:   rgba(197, 137, 59, 0.12);
+  --wash-oxblood: rgba(126, 43, 35, 0.18);
+  --wash-paper:   rgba(237, 228, 211, 0.05);
+}

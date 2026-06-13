@@ -1,4 +1,5 @@
 .env
+.env.jetson
 __pycache__/
 *.pyc
 .pytest_cache/
