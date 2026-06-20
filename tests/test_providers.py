@@ -6,23 +6,23 @@ import json
 import httpx
 import pytest
 
-from app import providers
+from app.providers import gemini as gemini_mod
+from app.providers import groq as groq_mod
+from app.providers import ollama as ollama_mod
 from app.providers import (
-    GeminiProvider,
-    GroqProvider,
-    OllamaProvider,
     ProviderConfigError,
     ProviderError,
     ProviderRateLimited,
     get_provider,
     validate_startup,
 )
+from app.providers.gemini import GeminiProvider
+from app.providers.groq import GroqProvider
+from app.providers.ollama import OllamaProvider
 
 SYSTEM = "test system prompt mentioning JSON"
-SCRIPT = "a script"
+USER = "a script"
 
-
-# --- selection ---------------------------------------------------------------
 
 def test_default_provider_is_gemini(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
@@ -44,8 +44,6 @@ def test_unknown_provider_fails_with_choices_listed(monkeypatch):
         get_provider()
 
 
-# --- startup validation -------------------------------------------------------
-
 def test_missing_gemini_key_fails_startup_with_signup_url(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -65,8 +63,6 @@ def test_ollama_needs_no_key(monkeypatch):
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
     assert isinstance(validate_startup(), OllamaProvider)
 
-
-# --- gemini -------------------------------------------------------------------
 
 class _FakeGeminiResponse:
     def __init__(self, text: str) -> None:
@@ -92,30 +88,32 @@ class _FakeGeminiClient:
 
 def _patch_gemini(monkeypatch, result) -> None:
     _FakeGeminiClient.instance_result = result
-    monkeypatch.setattr(providers.genai, "Client", _FakeGeminiClient)
+    monkeypatch.setattr(gemini_mod.genai, "Client", _FakeGeminiClient)
 
 
 def test_gemini_returns_raw_text(monkeypatch, valid_shot_list):
     _patch_gemini(monkeypatch, _FakeGeminiResponse(json.dumps(valid_shot_list)))
-    raw = GeminiProvider().generate_mapping(SCRIPT, system=SYSTEM)
+    raw = GeminiProvider().generate(SYSTEM, USER, json_mode=True)
     assert json.loads(raw) == valid_shot_list
 
 
 def test_gemini_429_becomes_rate_limited(monkeypatch):
-    exc = providers.genai_errors.APIError(429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    exc = gemini_mod.genai_errors.APIError(
+        429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}}
+    )
     _patch_gemini(monkeypatch, exc)
     with pytest.raises(ProviderRateLimited):
-        GeminiProvider().generate_mapping(SCRIPT, system=SYSTEM)
+        GeminiProvider().generate(SYSTEM, USER)
 
 
 def test_gemini_500_becomes_provider_error(monkeypatch):
-    exc = providers.genai_errors.APIError(500, {"error": {"message": "boom", "status": "INTERNAL"}})
+    exc = gemini_mod.genai_errors.APIError(
+        500, {"error": {"message": "boom", "status": "INTERNAL"}}
+    )
     _patch_gemini(monkeypatch, exc)
     with pytest.raises(ProviderError):
-        GeminiProvider().generate_mapping(SCRIPT, system=SYSTEM)
+        GeminiProvider().generate(SYSTEM, USER)
 
-
-# --- groq ---------------------------------------------------------------------
 
 class _FakeGroqChoice:
     def __init__(self, content: str) -> None:
@@ -142,7 +140,7 @@ class _FakeGroqClient:
 
 def _patch_groq(monkeypatch, result) -> None:
     _FakeGroqClient.instance_result = result
-    monkeypatch.setattr(providers.groq_sdk, "Groq", _FakeGroqClient)
+    monkeypatch.setattr(groq_mod.groq_sdk, "Groq", _FakeGroqClient)
 
 
 def _groq_http_response(status: int) -> httpx.Response:
@@ -153,24 +151,22 @@ def _groq_http_response(status: int) -> httpx.Response:
 def test_groq_returns_raw_text(monkeypatch, valid_shot_list):
     _patch_groq(monkeypatch, json.dumps(valid_shot_list))
     monkeypatch.setenv("GROQ_API_KEY", "test")
-    raw = GroqProvider().generate_mapping(SCRIPT, system=SYSTEM)
+    raw = GroqProvider().generate(SYSTEM, USER)
     assert json.loads(raw) == valid_shot_list
 
 
 def test_groq_429_becomes_rate_limited(monkeypatch):
-    exc = providers.groq_sdk.RateLimitError(
+    exc = groq_mod.groq_sdk.RateLimitError(
         "rate limited", response=_groq_http_response(429), body=None
     )
     _patch_groq(monkeypatch, exc)
     monkeypatch.setenv("GROQ_API_KEY", "test")
     with pytest.raises(ProviderRateLimited):
-        GroqProvider().generate_mapping(SCRIPT, system=SYSTEM)
+        GroqProvider().generate(SYSTEM, USER)
 
-
-# --- ollama --------------------------------------------------------------------
 
 def _patch_ollama_post(monkeypatch, handler) -> None:
-    monkeypatch.setattr(providers.httpx, "post", handler)
+    monkeypatch.setattr(ollama_mod.httpx, "post", handler)
 
 
 def test_ollama_returns_response_field(monkeypatch, valid_shot_list):
@@ -178,17 +174,15 @@ def test_ollama_returns_response_field(monkeypatch, valid_shot_list):
         assert url.endswith("/api/generate")
         assert json["format"] == "json"
         assert json["stream"] is False
-        request = httpx.Request("POST", url)
         import json as json_mod
-
         return httpx.Response(
             200,
-            request=request,
+            request=httpx.Request("POST", url),
             text=json_mod.dumps({"response": json_mod.dumps(valid_shot_list)}),
         )
 
     _patch_ollama_post(monkeypatch, fake_post)
-    raw = OllamaProvider().generate_mapping(SCRIPT, system=SYSTEM)
+    raw = OllamaProvider().generate(SYSTEM, USER)
     assert json.loads(raw) == valid_shot_list
 
 
@@ -198,7 +192,7 @@ def test_ollama_missing_model_gives_pull_hint(monkeypatch):
 
     _patch_ollama_post(monkeypatch, fake_post)
     with pytest.raises(ProviderError, match="ollama pull"):
-        OllamaProvider().generate_mapping(SCRIPT, system=SYSTEM)
+        OllamaProvider().generate(SYSTEM, USER)
 
 
 def test_ollama_unreachable_gives_install_hint(monkeypatch):
@@ -207,4 +201,21 @@ def test_ollama_unreachable_gives_install_hint(monkeypatch):
 
     _patch_ollama_post(monkeypatch, fake_post)
     with pytest.raises(ProviderError, match="ollama.com"):
-        OllamaProvider().generate_mapping(SCRIPT, system=SYSTEM)
+        OllamaProvider().generate(SYSTEM, USER)
+
+
+def test_json_mode_false_omits_gemini_mime(monkeypatch):
+    captured = {}
+
+    class _CapModels:
+        def generate_content(self, **kwargs):
+            captured["config"] = kwargs["config"]
+            return _FakeGeminiResponse("{}")
+
+    class _CapClient:
+        def __init__(self, **kwargs):
+            self.models = _CapModels()
+
+    monkeypatch.setattr(gemini_mod.genai, "Client", _CapClient)
+    GeminiProvider().generate(SYSTEM, USER, json_mode=False)
+    assert captured["config"].response_mime_type is None
