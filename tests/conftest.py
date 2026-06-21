@@ -49,3 +49,19 @@ def valid_script() -> str:
 @pytest.fixture()
 def valid_shot_list() -> dict:
     return VALID_SHOT_LIST
+
+
+@pytest.fixture()
+def sample_docx(tmp_path):
+    """A small real DOCX with a heading and paragraphs, for Format tests."""
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Chapter One", level=1)
+    doc.add_paragraph("It was a bright cold day and the clocks were striking.")
+    doc.add_paragraph("She walked the long road home, thinking of nothing at all.")
+    doc.add_heading("Chapter Two", level=1)
+    doc.add_paragraph("The second chapter opens on a quiet morning by the sea.")
+    path = tmp_path / "manuscript.docx"
+    doc.save(path)
+    return path

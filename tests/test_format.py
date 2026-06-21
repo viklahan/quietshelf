@@ -41,3 +41,67 @@ def test_generate_cover_handles_long_title():
 
     data = generate_cover("A " * 60 + "Very Long Title", "Author Name", Theme.modern)
     assert data[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_convert_docx_produces_valid_epub(sample_docx, tmp_path):
+    from app.services.format.converter import convert_to_epub
+    from app.services.format.models import Theme
+
+    out = tmp_path / "book.epub"
+    convert_to_epub(
+        source=sample_docx, out_path=out,
+        title="My Stories", author="Jane Writer", theme=Theme.cozy,
+    )
+    assert out.is_file()
+
+    import zipfile
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+        assert "mimetype" in names
+        assert zf.read("mimetype") == b"application/epub+zip"
+        assert any(n.endswith("container.xml") for n in names)
+        # the embedded theme font is present
+        assert any("Newsreader" in n for n in names)
+        # at least one chapter/content document exists
+        assert any(n.endswith(".xhtml") or n.endswith(".html") for n in names)
+
+
+def test_convert_txt_with_generated_cover(tmp_path):
+    from app.services.format.converter import convert_to_epub
+    from app.services.format.models import Theme
+
+    src = tmp_path / "story.txt"
+    src.write_text("First paragraph.\n\nSecond paragraph.\n", encoding="utf-8")
+    out = tmp_path / "txt.epub"
+    convert_to_epub(source=src, out_path=out, title="Plain", author="Anon", theme=Theme.modern)
+
+    import zipfile
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+        # pandoc embeds the cover image as a media file and creates a cover
+        # page entry; the image itself is named fileN.png (e.g. file0.png)
+        # and there is always a cover.xhtml wrapper page
+        assert any(n.lower().endswith(".png") for n in names), f"no PNG found in: {names}"
+        assert any("cover" in n.lower() for n in names), f"no cover entry found in: {names}"
+
+
+def test_convert_rejects_unknown_extension(tmp_path):
+    from app.services.format.converter import convert_to_epub, UnsupportedFormat
+    from app.services.format.models import Theme
+
+    src = tmp_path / "thing.pdf"
+    src.write_bytes(b"%PDF-1.4")
+    import pytest
+    with pytest.raises(UnsupportedFormat):
+        convert_to_epub(source=src, out_path=tmp_path / "x.epub",
+                        title="X", author="Y", theme=Theme.classic)
+
+
+def test_validate_epub_rejects_non_epub(tmp_path):
+    from app.services.format.converter import validate_epub, EpubValidationError
+
+    bad = tmp_path / "bad.epub"
+    bad.write_bytes(b"not a zip")
+    import pytest
+    with pytest.raises(EpubValidationError):
+        validate_epub(bad)
