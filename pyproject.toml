@@ -1,0 +1,19 @@
+[project]
+name = "quiet-shelf"
+version = "1.0.0"
+description = "A writer's toolkit: manuscript in, finished sellable things out."
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+quiet-shelf = "app.cli:app"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

@@ -1,5 +1,5 @@
 // QFCEngine — fake mapping engine for the UI kit. Deterministic, in-memory.
-// Mirrors the real backend's response shape from POST /api/map.
+// Mirrors the real backend's response shape from POST /api/promote.
 (function () {
   var WPM = 150;
 

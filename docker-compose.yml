@@ -1,5 +1,5 @@
 services:
-  qfc:
+  quiet-shelf:
     build: .
     ports:
       - "8000:8000"
