@@ -5,6 +5,15 @@ const { Button: QSButton, Icon: QSIcon } = QSDS_fmt;
 
 const QS_ALLOWED = ['docx', 'rtf', 'txt'];
 
+/* Keep file inputs in the render tree (not display:none) so a programmatic
+   .click() reliably opens the OS picker in every browser — display:none
+   inputs silently fail to open in Firefox/Safari. */
+const QS_HIDDEN_INPUT = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap',
+  border: 0, opacity: 0,
+};
+
 /* Typeset previews are presentation-only: they show how each theme *feels*.
    Real display names + descriptions come from the backend; we key the sample
    text and CSS face by the theme id the API returns. */
@@ -199,7 +208,7 @@ function Format() {
         <StepLabel n="1">Bring your story</StepLabel>
         <input
           ref={fileRef} type="file" accept=".docx,.rtf,.txt"
-          onChange={onPickStory} style={{ display: 'none' }} aria-hidden="true" tabIndex={-1}
+          onChange={onPickStory} style={QS_HIDDEN_INPUT} tabIndex={-1}
         />
         {storyName ? (
           <div className="qs-file qs-drop--filled">
@@ -251,7 +260,7 @@ function Format() {
       {/* 4 — Cover (optional) */}
       <div className="qs-step">
         <StepLabel n="4">Cover <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>— optional</span></StepLabel>
-        <input ref={coverRef} type="file" accept="image/*" onChange={onPickCover} style={{ display: 'none' }} aria-hidden="true" tabIndex={-1} />
+        <input ref={coverRef} type="file" accept="image/*" onChange={onPickCover} style={QS_HIDDEN_INPUT} tabIndex={-1} />
         {coverName ? (
           <div className="qs-file qs-drop--filled">
             <span className="qs-file__name"><QSIcon name="file-text" size={18} className="qs-file__ico" />{coverName}</span>

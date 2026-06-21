@@ -3,6 +3,14 @@
 const QSDS_blurb = window.QuietFightClubDesignSystem_fae847;
 const { Button: QSBtnBlurb, Icon: QSIcoBlurb, ScriptTextarea } = QSDS_blurb;
 
+/* Keep the file input rendered (not display:none) so a programmatic .click()
+   reliably opens the OS picker across browsers. */
+const QS_HIDDEN_INPUT = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap',
+  border: 0, opacity: 0,
+};
+
 const QS_TONES = [
   { id: 'warm', label: 'Warm' },
   { id: 'literary', label: 'Literary' },
@@ -146,7 +154,7 @@ function Blurb() {
           ariaLabel="Your story"
         />
         <div className="qs-actionrow" style={{ marginTop: 'var(--space-4)' }}>
-          <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={{ display: 'none' }} aria-hidden="true" tabIndex={-1} />
+          <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={QS_HIDDEN_INPUT} tabIndex={-1} />
           {file ? (
             <div className="qs-file qs-drop--filled" style={{ flex: 1 }}>
               <span className="qs-file__name"><QSIcoBlurb name="file-text" size={18} className="qs-file__ico" />{file.name}</span>
