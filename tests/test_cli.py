@@ -44,3 +44,23 @@ def test_format_command_writes_epub(tmp_path, sample_docx):
     assert result.exit_code == 0
     assert out.is_file()
     assert out.read_bytes()[:2] == b"PK"
+
+
+def test_format_command_unsupported_file_fails_friendly(tmp_path):
+    bad = tmp_path / "thing.pdf"
+    bad.write_bytes(b"%PDF-1.4")
+    result = runner.invoke(
+        app,
+        ["format", str(bad), "--title", "X", "--author", "Y", "--theme", "classic"],
+    )
+    assert result.exit_code != 0
+    assert result.exception is None or isinstance(result.exception, SystemExit)  # no raw traceback
+
+
+def test_blurb_command_unsupported_file_fails_friendly(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    bad = tmp_path / "thing.pdf"
+    bad.write_bytes(b"%PDF-1.4")
+    result = runner.invoke(app, ["blurb", str(bad)])
+    assert result.exit_code != 0
+    assert result.exception is None or isinstance(result.exception, SystemExit)  # no raw traceback

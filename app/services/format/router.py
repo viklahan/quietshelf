@@ -90,6 +90,17 @@ async def format_manuscript(
                 "message": "We couldn't build a valid EPUB from that file. Try a DOCX export.",
             },
         )
+    except Exception:
+        # pandoc/Pillow/IO failures - clean up and stay friendly, never a raw trace.
+        _cleanup(workdir)
+        logger.exception("format_failed theme=%s", theme.value)
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "conversion_failed",
+                "message": "Something went wrong converting that file. Try a DOCX export.",
+            },
+        )
 
     logger.info("format_complete theme=%s size_bytes=%d", theme.value, out.stat().st_size)
 

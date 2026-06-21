@@ -18,10 +18,15 @@ from app.providers import (
     ProviderError,
     validate_startup,
 )
+from app.services.blurb.extract import UnsupportedFormat as BlurbUnsupportedFormat
 from app.services.blurb.extract import extract_text
 from app.services.blurb.generator import generate_blurb
 from app.services.blurb.models import Length, Tone
-from app.services.format.converter import UnsupportedFormat, convert_to_epub
+from app.services.format.converter import (
+    EpubValidationError,
+    UnsupportedFormat,
+    convert_to_epub,
+)
 from app.services.format.models import Theme
 from app.services.format.themes import THEMES
 from app.services.promote.mapper import map_script
@@ -74,6 +79,12 @@ def format(
     except UnsupportedFormat as exc:
         err.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(code=1)
+    except EpubValidationError:
+        err.print("[red]error:[/red] We couldn't build a valid EPUB from that file. Try a DOCX export.")
+        raise typer.Exit(code=2)
+    except Exception:  # pandoc/Pillow/IO failures - never show a raw trace
+        err.print("[red]error:[/red] Something went wrong converting that file. Check it opens in your word processor and try again.")
+        raise typer.Exit(code=2)
     console.print(f"[green]Wrote[/green] {out_path}")
 
 
@@ -86,7 +97,11 @@ def blurb(
 ) -> None:
     """Generate back-cover copy, taglines, and keywords from a manuscript."""
     _require_provider()
-    text = extract_text(manuscript.read_bytes(), manuscript.suffix.lower())
+    try:
+        text = extract_text(manuscript.read_bytes(), manuscript.suffix.lower())
+    except BlurbUnsupportedFormat as exc:
+        err.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1)
     console.print(f"Writing {tone.value} copy with {config.provider_name()}/{config.model_name()}...")
     try:
         result = generate_blurb(text, tone=tone, length=length)
@@ -108,7 +123,7 @@ def promote(
 ) -> None:
     """Map a script (plain text) into a stock-footage shot list."""
     _require_provider()
-    text = script.read_text(encoding="utf-8")
+    text = script.read_text(encoding="utf-8", errors="ignore")
     word_count = len(text.split())
     if word_count < config.MIN_WORDS:
         err.print(f"[red]error:[/red] script too short - needs at least {config.MIN_WORDS} words (got {word_count}).")
