@@ -67,3 +67,30 @@ def test_blurb_result_validates_three_taglines():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         BlurbResult(back_cover="x", taglines=["one", "two"], short_description="y", keywords=["z"])
+
+
+def test_blurb_endpoint_with_pasted_text(client, monkeypatch):
+    from app.services.blurb import router as blurb_router_mod
+    from app.services.blurb.models import BlurbResult
+
+    fake = BlurbResult(
+        back_cover="A quiet, aching novel.",
+        taglines=["One.", "Two.", "Three."],
+        short_description="Short description here.",
+        keywords=["literary fiction"],
+    )
+    monkeypatch.setattr(blurb_router_mod, "generate_blurb", lambda *a, **k: fake)
+
+    response = client.post(
+        "/api/blurb",
+        data={"text": "word " * 80, "tone": "warm", "length": "short"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["taglines"]) == 3
+    assert body["back_cover"]
+
+
+def test_blurb_endpoint_rejects_too_short(client):
+    response = client.post("/api/blurb", data={"text": "too short"})
+    assert response.status_code == 422

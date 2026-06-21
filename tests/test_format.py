@@ -105,3 +105,28 @@ def test_validate_epub_rejects_non_epub(tmp_path):
     import pytest
     with pytest.raises(EpubValidationError):
         validate_epub(bad)
+
+
+def test_format_endpoint_returns_epub(client, sample_docx):
+    with open(sample_docx, "rb") as fh:
+        response = client.post(
+            "/api/format",
+            data={"title": "My Stories", "author": "Jane Writer", "theme": "cozy"},
+            files={"file": ("manuscript.docx", fh, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/epub+zip"
+    assert response.content[:2] == b"PK"  # zip magic
+
+
+def test_format_endpoint_rejects_unsupported(client, tmp_path):
+    bad = tmp_path / "x.pdf"
+    bad.write_bytes(b"%PDF-1.4")
+    with open(bad, "rb") as fh:
+        response = client.post(
+            "/api/format",
+            data={"title": "X", "author": "Y", "theme": "classic"},
+            files={"file": ("x.pdf", fh, "application/pdf")},
+        )
+    assert response.status_code == 415
+    assert response.json()["error"] == "unsupported_format"
