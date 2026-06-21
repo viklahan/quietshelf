@@ -24,3 +24,20 @@ def test_get_theme_rejects_unknown():
     import pytest
     with pytest.raises(KeyError):
         get_theme("nonsense")  # type: ignore[arg-type]
+
+
+def test_generate_cover_returns_png_bytes():
+    from app.services.format.cover import generate_cover
+    from app.services.format.models import Theme
+
+    data = generate_cover("The Long Road Home", "Jane Writer", Theme.classic)
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    assert len(data) > 1000
+
+
+def test_generate_cover_handles_long_title():
+    from app.services.format.cover import generate_cover
+    from app.services.format.models import Theme
+
+    data = generate_cover("A " * 60 + "Very Long Title", "Author Name", Theme.modern)
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
