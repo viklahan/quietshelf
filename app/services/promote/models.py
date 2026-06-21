@@ -1,10 +1,10 @@
-"""Pydantic v2 request/response models. The response shape is the contract."""
+"""Promote response contract."""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
-class MapRequest(BaseModel):
+class PromoteRequest(BaseModel):
     script: str = Field(..., description="Full script text, 100-3000 words.")
 
 

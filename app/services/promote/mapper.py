@@ -1,4 +1,8 @@
-"""The baked-in mapping prompt. This is the product's brain."""
+"""Promote engine: the baked-in visual-mapping prompt + one generate_json call."""
+from __future__ import annotations
+
+from app.providers import generate_json
+from app.services.promote.models import ShotList
 
 SYSTEM_PROMPT = """\
 You are a visual mapping engine for video essays that use stock footage.
@@ -24,8 +28,7 @@ Cover the COMPLETE script start to finish. Never summarize, skip, or stop early.
 Respond with ONLY a valid JSON object matching this structure. No markdown fences, no commentary, no preamble.
 """
 
-RETRY_INSTRUCTION = (
-    "\n\nIMPORTANT: Your previous response could not be parsed. "
-    "Respond with ONLY a single valid JSON object - no markdown fences, "
-    "no commentary, no text before or after the JSON."
-)
+
+def map_script(script: str) -> ShotList:
+    """Map a script to a validated shot list."""
+    return generate_json(SYSTEM_PROMPT, script, ShotList)
