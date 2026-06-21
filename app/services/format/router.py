@@ -1,28 +1,32 @@
-"""Format endpoint: POST /api/format to convert a manuscript to EPUB,
-GET /api/format/themes to list available themes."""
+"""Format endpoints: POST /api/format (returns .epub), GET /api/format/themes."""
 from __future__ import annotations
 
 import logging
+import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 
 from app import config
 from app.deps import guard
-from app.services.format.converter import UnsupportedFormat, convert_to_epub
+from app.services.format.converter import (
+    EpubValidationError,
+    UnsupportedFormat,
+    convert_to_epub,
+)
 from app.services.format.models import Theme, ThemeInfo, ThemeList
-from app.services.format.themes import THEMES
+from app.services.format.themes import THEMES, get_theme
 
 logger = logging.getLogger("quietshelf.format")
 
-router = APIRouter(prefix="/api", tags=["format"])
+router = APIRouter(prefix="/api/format", tags=["format"])
 
 
-@router.get("/format/themes", response_model=ThemeList)
+@router.get("/themes", response_model=ThemeList)
 def list_themes() -> ThemeList:
-    """Return all registered themes."""
     return ThemeList(
         themes=[
             ThemeInfo(id=spec.id, display_name=spec.display_name, description=spec.description)
@@ -31,48 +35,68 @@ def list_themes() -> ThemeList:
     )
 
 
-@router.post("/format")
+def _safe_stem(title: str) -> str:
+    keep = "".join(c if c.isalnum() or c in " -_" else "" for c in title).strip()
+    return (keep or "book").replace(" ", "_")[:60]
+
+
+def _cleanup(workdir: Path) -> None:
+    shutil.rmtree(workdir, ignore_errors=True)
+
+
+@router.post("")
 async def format_manuscript(
     request: Request,
+    file: UploadFile = File(...),
     title: str = Form(...),
     author: str = Form(...),
-    theme: Theme = Form(Theme.classic),
-    file: UploadFile = File(...),
+    theme: Theme = Form(...),
+    cover_image: UploadFile | None = File(None),
     _: None = Depends(guard),
 ):
-    """Convert an uploaded DOCX/RTF/TXT manuscript to a themed EPUB."""
+    get_theme(theme)  # validates enum membership
+
     raw = await file.read()
     max_bytes = config.max_upload_mb() * 1024 * 1024
     if len(raw) > max_bytes:
-        return JSONResponse(
+        raise HTTPException(
             status_code=413,
-            content={"error": "file_too_large", "message": f"File exceeds the {config.max_upload_mb()} MB limit."},
+            detail=f"File is larger than the {config.max_upload_mb()} MB limit.",
         )
 
     suffix = Path(file.filename or "upload").suffix.lower()
+    workdir = Path(tempfile.mkdtemp(prefix="quietshelf_req_"))
+    src = workdir / f"source{suffix}"
+    src.write_bytes(raw)
 
-    with tempfile.TemporaryDirectory(prefix="quietshelf_fmt_") as workdir:
-        src = Path(workdir) / f"manuscript{suffix}"
-        src.write_bytes(raw)
-        out = Path(workdir) / "output.epub"
+    cover_bytes = await cover_image.read() if cover_image is not None else None
+    out = workdir / f"{_safe_stem(title)}.epub"
 
-        try:
-            convert_to_epub(source=src, out_path=out, title=title, author=author, theme=theme)
-        except UnsupportedFormat as exc:
-            return JSONResponse(
-                status_code=415,
-                content={"error": "unsupported_format", "message": str(exc)},
-            )
+    try:
+        convert_to_epub(
+            source=src, out_path=out, title=title, author=author,
+            theme=theme, cover_image=cover_bytes,
+        )
+    except UnsupportedFormat as exc:
+        _cleanup(workdir)
+        return JSONResponse(status_code=415, content={"error": "unsupported_format", "message": str(exc)})
+    except EpubValidationError:
+        _cleanup(workdir)
+        logger.error("epub_validation_failed theme=%s", theme.value)
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "conversion_failed",
+                "message": "We couldn't build a valid EPUB from that file. Try a DOCX export.",
+            },
+        )
 
-        epub_bytes = out.read_bytes()
+    logger.info("format_complete theme=%s size_bytes=%d", theme.value, out.stat().st_size)
 
-    logger.info("format_endpoint theme=%s size=%d", theme.value, len(epub_bytes))
-
-    import io
-    from starlette.responses import StreamingResponse
-
-    return StreamingResponse(
-        io.BytesIO(epub_bytes),
+    # Stream the file, then clean up the whole request workdir.
+    return FileResponse(
+        out,
         media_type="application/epub+zip",
-        headers={"Content-Disposition": f'attachment; filename="{title}.epub"'},
+        filename=out.name,
+        background=BackgroundTask(_cleanup, workdir),
     )
