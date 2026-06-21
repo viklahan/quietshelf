@@ -1,9 +1,4 @@
-"""Environment-driven configuration.
-
-All settings are read lazily from the environment so that tests (and the CLI)
-can adjust them without re-importing modules. A local .env file is loaded once
-at import time if present.
-"""
+"""Environment-driven configuration, read lazily so tests/CLI can adjust it."""
 from __future__ import annotations
 
 import os
@@ -16,12 +11,14 @@ DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
     "groq": "llama-3.3-70b-versatile",
-    "ollama": "llama3.1:8b",
+    "ollama": "qwen2.5:latest",
 }
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
-DEFAULT_RATE_LIMIT = 10  # requests per hour per IP
+DEFAULT_RATE_LIMIT = 20  # requests per hour per IP
+DEFAULT_MAX_UPLOAD_MB = 25
 LLM_TIMEOUT_SECONDS = 120.0
 
+# Promote word bounds
 MIN_WORDS = 100
 MAX_WORDS = 3000
 
@@ -48,7 +45,6 @@ def ollama_host() -> str:
 
 
 def access_code() -> str | None:
-    """If set, requests to /api/map must carry a matching X-Access-Code header."""
     code = os.getenv("ACCESS_CODE", "").strip()
     return code or None
 
@@ -59,4 +55,9 @@ def allowed_origins() -> list[str]:
 
 
 def rate_limit_per_hour() -> int:
-    return int(os.getenv("RATE_LIMIT", str(DEFAULT_RATE_LIMIT)))
+    raw = os.getenv("RATE_LIMIT", str(DEFAULT_RATE_LIMIT)).split("/")[0].strip()
+    return int(raw or DEFAULT_RATE_LIMIT)
+
+
+def max_upload_mb() -> int:
+    return int(os.getenv("MAX_UPLOAD_MB", str(DEFAULT_MAX_UPLOAD_MB)))
