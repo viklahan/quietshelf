@@ -1,4 +1,4 @@
-/* @ds-bundle: {"format":3,"namespace":"QuietFightClubDesignSystem_fae847","components":[{"name":"Button","sourcePath":"components/actions/Button.jsx"},{"name":"FoundCheckbox","sourcePath":"components/actions/FoundCheckbox.jsx"},{"name":"Icon","sourcePath":"components/display/Icon.jsx"},{"name":"ProgressBar","sourcePath":"components/display/ProgressBar.jsx"},{"name":"SearchChip","sourcePath":"components/display/SearchChip.jsx"},{"name":"Stamp","sourcePath":"components/display/Stamp.jsx"},{"name":"ManuscriptCard","sourcePath":"components/manuscript/ManuscriptCard.jsx"},{"name":"ScriptTextarea","sourcePath":"components/manuscript/ScriptTextarea.jsx"}],"sourceHashes":{"components/actions/Button.jsx":"d8a2402f319b","components/actions/FoundCheckbox.jsx":"08d4e046968e","components/display/Icon.jsx":"d083b334effb","components/display/ProgressBar.jsx":"c5bd36db34c3","components/display/SearchChip.jsx":"488a9b250828","components/display/Stamp.jsx":"ce8061250835","components/manuscript/ManuscriptCard.jsx":"4684091ab3fa","components/manuscript/ScriptTextarea.jsx":"5b4cd9be4cae","ui_kits/quiet-fight-club/app.jsx":"fbd94005aa6b","ui_kits/quiet-fight-club/engine.js":"366cd4bb46ea","ui_kits/quiet-fight-club/screens.jsx":"8e8496cdcd20","ui_kits/quiet-fight-club/shotlist.jsx":"8daaa013118e"},"inlinedExternals":[],"unexposedExports":[]} */
+﻿/* @ds-bundle: {"format":3,"namespace":"QuietFightClubDesignSystem_fae847","components":[{"name":"Button","sourcePath":"components/actions/Button.jsx"},{"name":"FoundCheckbox","sourcePath":"components/actions/FoundCheckbox.jsx"},{"name":"Icon","sourcePath":"components/display/Icon.jsx"},{"name":"ProgressBar","sourcePath":"components/display/ProgressBar.jsx"},{"name":"SearchChip","sourcePath":"components/display/SearchChip.jsx"},{"name":"Stamp","sourcePath":"components/display/Stamp.jsx"},{"name":"ManuscriptCard","sourcePath":"components/manuscript/ManuscriptCard.jsx"},{"name":"ScriptTextarea","sourcePath":"components/manuscript/ScriptTextarea.jsx"}],"sourceHashes":{"components/actions/Button.jsx":"6263a7b9f23d","components/actions/FoundCheckbox.jsx":"d2d2ea4de528","components/display/Icon.jsx":"27f26c2cbd5d","components/display/ProgressBar.jsx":"2083f7a45609","components/display/SearchChip.jsx":"0bd3bfcf4ad5","components/display/Stamp.jsx":"f05bf6c4fc16","components/manuscript/ManuscriptCard.jsx":"48d594d45e65","components/manuscript/ScriptTextarea.jsx":"e182f4d188b7","design_handoff_quiet_shelf/prototype/app.jsx":"2f78be9fed77","design_handoff_quiet_shelf/prototype/blurb.jsx":"75c2b3d955f9","design_handoff_quiet_shelf/prototype/data.js":"acb0e00458e9","design_handoff_quiet_shelf/prototype/format.jsx":"bf0aef92ef96","design_handoff_quiet_shelf/prototype/home.jsx":"b4fc505a546e","design_handoff_quiet_shelf/prototype/promote.jsx":"732254faa414","design_handoff_quiet_shelf/prototype/ui.jsx":"8cd32a209f24","quit-happens/app.jsx":"1a0b57d75a5d","quit-happens/cards.jsx":"9033d8e7ecbe","quit-happens/components.jsx":"d51028d82aeb","quit-happens/engine.js":"1f015bd4c8df","quit-happens/icons.jsx":"07ffd864d55f","quit-happens/results.jsx":"6983569fc09e","quit-happens/screens.jsx":"7c6724f6cdd2","ui_kits/quiet-shelf-promote/app.jsx":"8f4a9083e880","ui_kits/quiet-shelf-promote/engine.js":"e14a980c5717","ui_kits/quiet-shelf-promote/screens.jsx":"994c895d266a","ui_kits/quiet-shelf-promote/shotlist.jsx":"7de5e9ba6d34","ui_kits/quiet-shelf/app.jsx":"2f78be9fed77","ui_kits/quiet-shelf/blurb.jsx":"75c2b3d955f9","ui_kits/quiet-shelf/data.js":"acb0e00458e9","ui_kits/quiet-shelf/format.jsx":"bf0aef92ef96","ui_kits/quiet-shelf/home.jsx":"b4fc505a546e","ui_kits/quiet-shelf/promote.jsx":"732254faa414","ui_kits/quiet-shelf/ui.jsx":"8cd32a209f24"},"inlinedExternals":[],"unexposedExports":[]} */
 
 (() => {
 
@@ -10,10 +10,10 @@ const __ds_scope = {};
 
 // components/display/Icon.jsx
 try { (() => {
-// Icon — Quiet Fight Club's lucide subset, inlined from lucide-static@0.453.0 (ISC).
+// Icon â€” Quiet Shelf's lucide subset, inlined from lucide-static@0.453.0 (ISC).
 // Quiet, consistent 2px stroke. Icons are small and never decorative noise.
 
-const QFC_ICON_PATHS = {
+const ICON_PATHS = {
   "feather": "<path d=\"M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z\"></path> <path d=\"M16 8 2 22\"></path> <path d=\"M17.5 15H9\"></path>",
   "pen-line": "<path d=\"M12 20h9\"></path> <path d=\"M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z\"></path>",
   "film": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"></rect> <path d=\"M7 3v18\"></path> <path d=\"M3 7.5h4\"></path> <path d=\"M3 12h18\"></path> <path d=\"M3 16.5h4\"></path> <path d=\"M17 3v18\"></path> <path d=\"M17 7.5h4\"></path> <path d=\"M17 16.5h4\"></path>",
@@ -42,7 +42,7 @@ function Icon({
   className,
   title
 }) {
-  const inner = QFC_ICON_PATHS[name];
+  const inner = ICON_PATHS[name];
   if (!inner) return null;
   return /*#__PURE__*/React.createElement("svg", {
     width: size,
@@ -65,16 +65,16 @@ function Icon({
     }
   });
 }
-Icon.names = Object.keys(QFC_ICON_PATHS);
+Icon.names = Object.keys(ICON_PATHS);
 Object.assign(__ds_scope, { Icon });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/display/Icon.jsx", error: String((e && e.message) || e) }); }
 
 // components/actions/Button.jsx
 try { (() => {
-// Button — mono, letterspaced, typewriter-stamp buttons. One primary per view.
+// Button â€” mono, letterspaced, typewriter-stamp buttons. One primary per view.
 
 const BUTTON_CSS = `
-.qfc-btn {
+.qs-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -94,44 +94,44 @@ const BUTTON_CSS = `
               color var(--dur-fast) var(--ease-quiet),
               transform var(--dur-fast) var(--ease-quiet);
 }
-.qfc-btn:active:not(:disabled) { transform: translateY(1px); }
-.qfc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.qs-btn:active:not(:disabled) { transform: translateY(1px); }
+.qs-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.qfc-btn--md { padding: 11px 18px; }
-.qfc-btn--sm { padding: 8px 12px; }
-.qfc-btn--lg { padding: 15px 26px; font-size: var(--fs-small); }
+.qs-btn--md { padding: 11px 18px; }
+.qs-btn--sm { padding: 8px 12px; }
+.qs-btn--lg { padding: 15px 26px; font-size: var(--fs-small); }
 
-.qfc-btn--primary {
+.qs-btn--primary {
   background: var(--accent);
   color: var(--on-accent);
 }
-.qfc-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-.qfc-btn--primary:active:not(:disabled) { background: var(--accent-press); }
+.qs-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.qs-btn--primary:active:not(:disabled) { background: var(--accent-press); }
 
-.qfc-btn--secondary {
+.qs-btn--secondary {
   background: transparent;
   border-color: var(--edge-strong);
   color: var(--text-body);
 }
-.qfc-btn--secondary:hover:not(:disabled) { background: var(--wash-paper); }
+.qs-btn--secondary:hover:not(:disabled) { background: var(--wash-paper); }
 
-.qfc-btn--ghost {
+.qs-btn--ghost {
   background: transparent;
   color: var(--text-muted);
 }
-.qfc-btn--ghost:hover:not(:disabled) { background: var(--wash-paper); color: var(--text-body); }
+.qs-btn--ghost:hover:not(:disabled) { background: var(--wash-paper); color: var(--text-body); }
 
-.qfc-btn--danger {
+.qs-btn--danger {
   background: transparent;
   border-color: rgba(160, 68, 55, 0.5);
   color: var(--danger-text);
 }
-.qfc-btn--danger:hover:not(:disabled) { background: var(--wash-oxblood); }
+.qs-btn--danger:hover:not(:disabled) { background: var(--wash-oxblood); }
 `;
 function injectButtonCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-btn-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-btn-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-btn-css';
+  el.id = 'qs-btn-css';
   el.textContent = BUTTON_CSS;
   document.head.appendChild(el);
 }
@@ -151,7 +151,7 @@ function Button({
   const iconSize = size === 'lg' ? 16 : 14;
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: `qfc-btn qfc-btn--${variant} qfc-btn--${size}${className ? ' ' + className : ''}`,
+    className: `qs-btn qs-btn--${variant} qs-btn--${size}${className ? ' ' + className : ''}`,
     disabled: disabled,
     onClick: onClick,
     "aria-label": ariaLabel,
@@ -169,10 +169,10 @@ Object.assign(__ds_scope, { Button });
 
 // components/actions/FoundCheckbox.jsx
 try { (() => {
-// FoundCheckbox — the satisfying "Found it" check. Quiet box, ember check.
+// FoundCheckbox â€” the satisfying "Found it" check. Quiet box, ember check.
 
 const FOUND_CSS = `
-.qfc-found {
+.qs-found {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -189,8 +189,8 @@ const FOUND_CSS = `
   color: var(--text-muted);
   transition: color var(--dur-fast) var(--ease-quiet);
 }
-.qfc-found:hover { color: var(--text-body); }
-.qfc-found__box {
+.qs-found:hover { color: var(--text-body); }
+.qs-found__box {
   width: 18px;
   height: 18px;
   border: 1px solid var(--edge-strong);
@@ -202,23 +202,23 @@ const FOUND_CSS = `
   transition: border-color var(--dur-fast) var(--ease-quiet),
               background var(--dur-fast) var(--ease-quiet);
 }
-.qfc-found:hover .qfc-found__box { border-color: var(--text-faint); }
-.qfc-found__check {
+.qs-found:hover .qs-found__box { border-color: var(--text-faint); }
+.qs-found__check {
   color: var(--ink-950);
   transform: scale(0);
   transition: transform var(--dur-base) var(--ease-settle);
 }
-.qfc-found[aria-checked="true"] { color: var(--ember-400); }
-.qfc-found[aria-checked="true"] .qfc-found__box {
+.qs-found[aria-checked="true"] { color: var(--ember-400); }
+.qs-found[aria-checked="true"] .qs-found__box {
   background: var(--accent);
   border-color: var(--accent);
 }
-.qfc-found[aria-checked="true"] .qfc-found__check { transform: scale(1); }
+.qs-found[aria-checked="true"] .qs-found__check { transform: scale(1); }
 `;
 function injectFoundCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-found-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-found-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-found-css';
+  el.id = 'qs-found-css';
   el.textContent = FOUND_CSS;
   document.head.appendChild(el);
 }
@@ -234,17 +234,17 @@ function FoundCheckbox({
     type: "button",
     role: "checkbox",
     "aria-checked": checked,
-    className: `qfc-found${className ? ' ' + className : ''}`,
+    className: `qs-found${className ? ' ' + className : ''}`,
     onClick: () => onChange && onChange(!checked),
     style: style
   }, /*#__PURE__*/React.createElement("span", {
-    className: "qfc-found__box",
+    className: "qs-found__box",
     "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
     name: "check",
     size: 13,
     strokeWidth: 3,
-    className: "qfc-found__check"
+    className: "qs-found__check"
   })), /*#__PURE__*/React.createElement("span", null, label));
 }
 Object.assign(__ds_scope, { FoundCheckbox });
@@ -252,27 +252,27 @@ Object.assign(__ds_scope, { FoundCheckbox });
 
 // components/display/ProgressBar.jsx
 try { (() => {
-// ProgressBar — thin, quiet progress indicator.
+// ProgressBar â€” thin, quiet progress indicator.
 
 const PROGRESS_CSS = `
-.qfc-progress {
+.qs-progress {
   display: block;
   width: 100%;
 }
-.qfc-progress__track {
+.qs-progress__track {
   height: 4px;
   width: 100%;
   background: var(--surface-pressed);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
-.qfc-progress__fill {
+.qs-progress__fill {
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
   transition: width var(--dur-slow) var(--ease-settle);
 }
-.qfc-progress__label {
+.qs-progress__label {
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
   letter-spacing: var(--ls-meta);
@@ -283,9 +283,9 @@ const PROGRESS_CSS = `
 }
 `;
 function injectProgressCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-progress-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-progress-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-progress-css';
+  el.id = 'qs-progress-css';
   el.textContent = PROGRESS_CSS;
   document.head.appendChild(el);
 }
@@ -298,7 +298,7 @@ function ProgressBar({
   injectProgressCss();
   const pct = Math.max(0, Math.min(1, value)) * 100;
   return /*#__PURE__*/React.createElement("div", {
-    className: `qfc-progress${className ? ' ' + className : ''}`,
+    className: `qs-progress${className ? ' ' + className : ''}`,
     style: style,
     role: "progressbar",
     "aria-valuemin": 0,
@@ -306,11 +306,11 @@ function ProgressBar({
     "aria-valuenow": Math.round(pct),
     "aria-label": label || 'Progress'
   }, label ? /*#__PURE__*/React.createElement("span", {
-    className: "qfc-progress__label"
+    className: "qs-progress__label"
   }, label) : null, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-progress__track"
+    className: "qs-progress__track"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-progress__fill",
+    className: "qs-progress__fill",
     style: {
       width: pct + '%'
     }
@@ -321,10 +321,10 @@ Object.assign(__ds_scope, { ProgressBar });
 
 // components/display/SearchChip.jsx
 try { (() => {
-// SearchChip — a clickable search-term tab that opens a stock-footage search.
+// SearchChip â€” a clickable search-term tab that opens a stock-footage search.
 
 const CHIP_CSS = `
-.qfc-chip {
+.qs-chip {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -342,23 +342,23 @@ const CHIP_CSS = `
               border-color var(--dur-fast) var(--ease-quiet),
               color var(--dur-fast) var(--ease-quiet);
 }
-.qfc-chip:hover {
+.qs-chip:hover {
   background: var(--surface-pressed);
   border-color: var(--edge-strong);
 }
-.qfc-chip:active { transform: translateY(1px); }
-.qfc-chip .qfc-chip__icon { color: var(--text-faint); transition: color var(--dur-fast) var(--ease-quiet); }
-.qfc-chip:hover .qfc-chip__icon { color: var(--text-muted); }
-.qfc-chip--best {
+.qs-chip:active { transform: translateY(1px); }
+.qs-chip .qs-chip__icon { color: var(--text-faint); transition: color var(--dur-fast) var(--ease-quiet); }
+.qs-chip:hover .qs-chip__icon { color: var(--text-muted); }
+.qs-chip--best {
   border-color: rgba(197, 137, 59, 0.45);
   background: var(--wash-ember);
 }
-.qfc-chip--best:hover {
+.qs-chip--best:hover {
   border-color: var(--ember-500);
   background: rgba(197, 137, 59, 0.2);
 }
-.qfc-chip--best .qfc-chip__icon { color: var(--ember-500); }
-.qfc-chip__best-tag {
+.qs-chip--best .qs-chip__icon { color: var(--ember-500); }
+.qs-chip__best-tag {
   font-size: 0.625rem;
   letter-spacing: var(--ls-stamp);
   text-transform: uppercase;
@@ -368,9 +368,9 @@ const CHIP_CSS = `
 }
 `;
 function injectChipCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-chip-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-chip-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-chip-css';
+  el.id = 'qs-chip-css';
   el.textContent = CHIP_CSS;
   document.head.appendChild(el);
 }
@@ -385,19 +385,19 @@ function SearchChip({
   injectChipCss();
   const url = href || `https://www.pexels.com/search/videos/${encodeURIComponent(term)}/`;
   return /*#__PURE__*/React.createElement("a", {
-    className: `qfc-chip${best ? ' qfc-chip--best' : ''}${className ? ' ' + className : ''}`,
+    className: `qs-chip${best ? ' qs-chip--best' : ''}${className ? ' ' + className : ''}`,
     href: url,
     target: "_blank",
     rel: "noopener noreferrer",
     onClick: onClick,
     style: style,
-    "aria-label": `Search stock footage for “${term}”${best ? ' (best bet)' : ''}`
+    "aria-label": `Search stock footage for â€œ${term}â€${best ? ' (best bet)' : ''}`
   }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
     name: "search",
     size: 13,
-    className: "qfc-chip__icon"
+    className: "qs-chip__icon"
   }), /*#__PURE__*/React.createElement("span", null, term), best ? /*#__PURE__*/React.createElement("span", {
-    className: "qfc-chip__best-tag"
+    className: "qs-chip__best-tag"
   }, "best bet") : null);
 }
 Object.assign(__ds_scope, { SearchChip });
@@ -405,10 +405,10 @@ Object.assign(__ds_scope, { SearchChip });
 
 // components/display/Stamp.jsx
 try { (() => {
-// Stamp — small rubber-stamp badge for moods and statuses.
+// Stamp â€” small rubber-stamp badge for moods and statuses.
 
 const STAMP_CSS = `
-.qfc-stamp {
+.qs-stamp {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -425,26 +425,26 @@ const STAMP_CSS = `
   background: transparent;
   white-space: nowrap;
 }
-.qfc-stamp--ember {
+.qs-stamp--ember {
   color: var(--ember-400);
   border-color: rgba(197, 137, 59, 0.45);
   background: var(--wash-ember);
 }
-.qfc-stamp--oxblood {
+.qs-stamp--oxblood {
   color: var(--oxblood-400);
   border-color: rgba(160, 68, 55, 0.5);
   background: var(--wash-oxblood);
 }
-.qfc-stamp--paper {
+.qs-stamp--paper {
   color: var(--text-body);
   border-color: var(--edge-strong);
   background: var(--wash-paper);
 }
 `;
 function injectStampCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-stamp-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-stamp-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-stamp-css';
+  el.id = 'qs-stamp-css';
   el.textContent = STAMP_CSS;
   document.head.appendChild(el);
 }
@@ -455,9 +455,9 @@ function Stamp({
   className
 }) {
   injectStampCss();
-  const toneClass = tone !== 'neutral' ? ` qfc-stamp--${tone}` : '';
+  const toneClass = tone !== 'neutral' ? ` qs-stamp--${tone}` : '';
   return /*#__PURE__*/React.createElement("span", {
-    className: `qfc-stamp${toneClass}${className ? ' ' + className : ''}`,
+    className: `qs-stamp${toneClass}${className ? ' ' + className : ''}`,
     style: style
   }, children);
 }
@@ -466,12 +466,12 @@ Object.assign(__ds_scope, { Stamp });
 
 // components/manuscript/ManuscriptCard.jsx
 try { (() => {
-// ManuscriptCard — the signature element. One segment of the shot list,
-// styled like an index card from a writer's desk. Found ⇒ set aside, faded,
+// ManuscriptCard â€” the signature element. One segment of the shot list,
+// styled like an index card from a writer's desk. Found â‡’ set aside, faded,
 // stamped.
 
 const MCARD_CSS = `
-.qfc-mcard {
+.qs-mcard {
   position: relative;
   background: var(--surface-card);
   border: var(--border-card);
@@ -481,7 +481,7 @@ const MCARD_CSS = `
   transition: border-color var(--dur-base) var(--ease-quiet),
               box-shadow var(--dur-base) var(--ease-quiet);
 }
-.qfc-mcard__head {
+.qs-mcard__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -491,22 +491,22 @@ const MCARD_CSS = `
   margin-bottom: var(--space-4);
   border-bottom: 1px solid rgba(126, 43, 35, 0.4); /* index-card rule */
 }
-.qfc-mcard__id {
+.qs-mcard__id {
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
   letter-spacing: var(--ls-meta);
   color: var(--text-muted);
 }
-.qfc-mcard__id strong {
+.qs-mcard__id strong {
   color: var(--text-body);
   font-weight: 600;
 }
-.qfc-mcard__meta {
+.qs-mcard__meta {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
-.qfc-mcard__clock {
+.qs-mcard__clock {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -516,7 +516,7 @@ const MCARD_CSS = `
   color: var(--text-faint);
   white-space: nowrap;
 }
-.qfc-mcard__excerpt {
+.qs-mcard__excerpt {
   font-family: var(--font-body);
   font-size: var(--fs-script);
   line-height: var(--lh-script);
@@ -526,14 +526,14 @@ const MCARD_CSS = `
   transition: opacity var(--dur-base) var(--ease-quiet);
   text-wrap: pretty;
 }
-.qfc-mcard__terms {
+.qs-mcard__terms {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-5);
   transition: opacity var(--dur-base) var(--ease-quiet);
 }
-.qfc-mcard__stampbox {
+.qs-mcard__stampbox {
   position: absolute;
   top: var(--space-4);
   right: var(--space-5);
@@ -555,22 +555,22 @@ const MCARD_CSS = `
   transition: opacity var(--dur-base) var(--ease-settle),
               transform var(--dur-base) var(--ease-settle);
 }
-.qfc-mcard--done { border-color: rgba(197, 137, 59, 0.28); }
-.qfc-mcard--done .qfc-mcard__excerpt,
-.qfc-mcard--done .qfc-mcard__terms,
-.qfc-mcard--done .qfc-mcard__head { opacity: 0.45; }
-.qfc-mcard--done .qfc-mcard__stampbox {
+.qs-mcard--done { border-color: rgba(197, 137, 59, 0.28); }
+.qs-mcard--done .qs-mcard__excerpt,
+.qs-mcard--done .qs-mcard__terms,
+.qs-mcard--done .qs-mcard__head { opacity: 0.45; }
+.qs-mcard--done .qs-mcard__stampbox {
   opacity: 1;
   transform: rotate(-5deg) scale(1);
 }
 @media (max-width: 560px) {
-  .qfc-mcard { padding: var(--space-4); }
+  .qs-mcard { padding: var(--space-4); }
 }
 `;
 function injectMcardCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-mcard-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-mcard-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-mcard-css';
+  el.id = 'qs-mcard-css';
   el.textContent = MCARD_CSS;
   document.head.appendChild(el);
 }
@@ -593,25 +593,25 @@ function ManuscriptCard({
 }) {
   injectMcardCss();
   return /*#__PURE__*/React.createElement("article", {
-    className: `qfc-mcard${found ? ' qfc-mcard--done' : ''}${className ? ' ' + className : ''}`,
+    className: `qs-mcard${found ? ' qs-mcard--done' : ''}${className ? ' ' + className : ''}`,
     style: style
   }, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-mcard__head"
+    className: "qs-mcard__head"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "qfc-mcard__id"
+    className: "qs-mcard__id"
   }, /*#__PURE__*/React.createElement("strong", null, pad2(index)), " \xB7 ", startTime, "\u2013", endTime), /*#__PURE__*/React.createElement("span", {
-    className: "qfc-mcard__meta"
+    className: "qs-mcard__meta"
   }, mood ? /*#__PURE__*/React.createElement(__ds_scope.Stamp, {
     tone: moodTone
   }, mood) : null, clipDurationSeconds ? /*#__PURE__*/React.createElement("span", {
-    className: "qfc-mcard__clock"
+    className: "qs-mcard__clock"
   }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
     name: "clock",
     size: 13
   }), "~", clipDurationSeconds, "s clip") : null)), /*#__PURE__*/React.createElement("p", {
-    className: "qfc-mcard__excerpt"
+    className: "qs-mcard__excerpt"
   }, excerpt), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-mcard__terms"
+    className: "qs-mcard__terms"
   }, terms.map((term, i) => /*#__PURE__*/React.createElement(__ds_scope.SearchChip, {
     key: term + i,
     term: term,
@@ -620,7 +620,7 @@ function ManuscriptCard({
     checked: found,
     onChange: onFoundChange
   }), /*#__PURE__*/React.createElement("span", {
-    className: "qfc-mcard__stampbox",
+    className: "qs-mcard__stampbox",
     "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
     name: "circle-check",
@@ -632,10 +632,10 @@ Object.assign(__ds_scope, { ManuscriptCard });
 
 // components/manuscript/ScriptTextarea.jsx
 try { (() => {
-// ScriptTextarea — a manuscript page to paste a script into.
+// ScriptTextarea â€” a manuscript page to paste a script into.
 
 const SCRIPTTA_CSS = `
-.qfc-scriptta {
+.qs-scriptta {
   display: block;
   width: 100%;
   background: var(--surface-card);
@@ -650,23 +650,23 @@ const SCRIPTTA_CSS = `
   resize: vertical;
   transition: border-color var(--dur-fast) var(--ease-quiet);
 }
-.qfc-scriptta::placeholder {
+.qs-scriptta::placeholder {
   color: var(--text-faint);
   font-style: italic;
 }
-.qfc-scriptta:hover { border-color: var(--edge-strong); }
-.qfc-scriptta:focus {
+.qs-scriptta:hover { border-color: var(--edge-strong); }
+.qs-scriptta:focus {
   outline: none;
   border-color: rgba(197, 137, 59, 0.55);
 }
 @media (max-width: 560px) {
-  .qfc-scriptta { padding: var(--space-4); }
+  .qs-scriptta { padding: var(--space-4); }
 }
 `;
 function injectScriptTaCss() {
-  if (typeof document === 'undefined' || document.getElementById('qfc-scriptta-css')) return;
+  if (typeof document === 'undefined' || document.getElementById('qs-scriptta-css')) return;
   const el = document.createElement('style');
-  el.id = 'qfc-scriptta-css';
+  el.id = 'qs-scriptta-css';
   el.textContent = SCRIPTTA_CSS;
   document.head.appendChild(el);
 }
@@ -681,7 +681,7 @@ function ScriptTextarea({
 }) {
   injectScriptTaCss();
   return /*#__PURE__*/React.createElement("textarea", {
-    className: `qfc-scriptta${className ? ' ' + className : ''}`,
+    className: `qs-scriptta${className ? ' ' + className : ''}`,
     value: value,
     onChange: e => onChange && onChange(e.target.value),
     placeholder: placeholder,
@@ -696,493 +696,14 @@ function ScriptTextarea({
 Object.assign(__ds_scope, { ScriptTextarea });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/manuscript/ScriptTextarea.jsx", error: String((e && e.message) || e) }); }
 
-// ui_kits/quiet-fight-club/app.jsx
-try { (() => {
-// App — owns the state machine: empty → working → results (or error).
-// All state in memory. No storage, no accounts, no nav.
-
-function App() {
-  const [phase, setPhase] = React.useState('empty'); // empty | working | results | error
-  const [script, setScript] = React.useState('');
-  const [fieldError, setFieldError] = React.useState(null);
-  const [result, setResult] = React.useState(null);
-  const [found, setFound] = React.useState({});
-  const [copied, setCopied] = React.useState(false);
-  const [confirmingNew, setConfirmingNew] = React.useState(false);
-  const [dealt, setDealt] = React.useState(false);
-  const timers = React.useRef([]);
-  React.useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
-  function startMapping() {
-    const words = window.QFCEngine.countWords(script);
-    if (words === 0) {
-      setFieldError("There's no script here yet. Paste it in and we'll get to work.");
-      return;
-    }
-    if (words < 100) {
-      setFieldError('This looks like a fragment. Paste the full script for a proper shot list.');
-      return;
-    }
-    setFieldError(null);
-    setPhase('working');
-    later(() => {
-      // Demo hook: a script containing [fail] exercises the engine-error state.
-      if (/\[fail\]/i.test(script)) {
-        setPhase('error');
-        return;
-      }
-      const r = window.QFCEngine.map(script);
-      setResult(r);
-      setFound({});
-      setDealt(true);
-      setPhase('results');
-      later(() => setDealt(false), 2400);
-    }, 3400);
-  }
-  function copyForNotion() {
-    const md = window.buildMarkdown(result, found);
-    const fallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = md;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(md).catch(fallback);
-    } else {
-      fallback();
-    }
-    setCopied(true);
-    later(() => setCopied(false), 2000);
-  }
-  function resetAll() {
-    setScript('');
-    setResult(null);
-    setFound({});
-    setConfirmingNew(false);
-    setFieldError(null);
-    setPhase('empty');
-  }
-  if (phase === 'working') return /*#__PURE__*/React.createElement(Working, null);
-  if (phase === 'error') {
-    return /*#__PURE__*/React.createElement(EngineError, {
-      onRetry: startMapping,
-      onBack: () => setPhase('empty')
-    });
-  }
-  if (phase === 'results' && result) {
-    const foundCount = result.segments.filter(s => found[s.id]).length;
-    return /*#__PURE__*/React.createElement("div", {
-      className: "qfc-results",
-      "data-screen-label": "Shot List"
-    }, /*#__PURE__*/React.createElement(SummaryBar, {
-      result: result,
-      foundCount: foundCount,
-      onCopy: copyForNotion,
-      copied: copied,
-      onNewScript: () => setConfirmingNew(true),
-      confirmingNew: confirmingNew,
-      onConfirmNew: resetAll,
-      onCancelNew: () => setConfirmingNew(false)
-    }), /*#__PURE__*/React.createElement(ShotList, {
-      result: result,
-      found: found,
-      onFoundChange: (id, v) => setFound(f => ({
-        ...f,
-        [id]: v
-      })),
-      onMapRest: () => {},
-      dealt: dealt
-    }));
-  }
-  return /*#__PURE__*/React.createElement(EmptyDesk, {
-    script: script,
-    onScriptChange: v => {
-      setScript(v);
-      if (fieldError) setFieldError(null);
-    },
-    onMap: startMapping,
-    onSample: () => {
-      setScript(window.QFCEngine.SAMPLE_SCRIPT);
-      setFieldError(null);
-    },
-    error: fieldError
-  });
-}
-ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
-})(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/quiet-fight-club/app.jsx", error: String((e && e.message) || e) }); }
-
-// ui_kits/quiet-fight-club/engine.js
-try { (() => {
-// QFCEngine — fake mapping engine for the UI kit. Deterministic, in-memory.
-// Mirrors the real backend's response shape from POST /api/map.
-(function () {
-  var WPM = 150;
-  var STOP = new Set('a an and are as at be been but by for from had has have he her his i if in into is it its me my of on or our out so than that the their them then there they this to up was we were what when which who will with you your yet not no nor do does did done just only very own same too can could would should about over under again once more most other some such'.split(' '));
-  var MOOD_LEXICON = [[/rain|leaving|window|gone|doubt|empty|alone/i, 'wistful'], [/fight|boxer|rounds|blank|cold|bark|deadline/i, 'tense'], [/sunrise|begin|method|accumulat|worth|true|strong/i, 'resolute'], [/quiet|silence|lamp|snow|hum|night|slow/i, 'quiet'], [/city|street|train|harbor|kitchen|shop/i, 'reflective']];
-  var MOOD_CYCLE = ['reflective', 'quiet', 'resolute', 'wistful', 'tense'];
-  var MOOD_TERMS = {
-    wistful: 'rain on train window',
-    tense: 'boxer wrapping hands gym',
-    resolute: 'typewriter desk lamp night',
-    quiet: 'snow falling streetlight',
-    reflective: 'empty city street night'
-  };
-  function countWords(text) {
-    var m = (text || '').trim().match(/\S+/g);
-    return m ? m.length : 0;
-  }
-  function fmtTime(totalSeconds) {
-    var s = Math.max(0, Math.round(totalSeconds));
-    var m = Math.floor(s / 60);
-    var r = s % 60;
-    return m + ':' + String(r).padStart(2, '0');
-  }
-  function keywords(text, n) {
-    var freq = {};
-    (text.toLowerCase().match(/[a-z']{4,}/g) || []).forEach(function (w) {
-      w = w.replace(/'s$/, '');
-      if (STOP.has(w)) return;
-      freq[w] = (freq[w] || 0) + 1;
-    });
-    return Object.keys(freq).sort(function (a, b) {
-      return freq[b] - freq[a] || b.length - a.length;
-    }).slice(0, n);
-  }
-  function moodFor(text, i) {
-    for (var k = 0; k < MOOD_LEXICON.length; k++) {
-      if (MOOD_LEXICON[k][0].test(text)) return MOOD_LEXICON[k][1];
-    }
-    return MOOD_CYCLE[i % MOOD_CYCLE.length];
-  }
-  function map(script) {
-    var sentences = script.replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]+["']?|[^.!?…]+$/g) || [];
-    // Group sentences into ~40-word segments.
-    var groups = [];
-    var cur = '';
-    sentences.forEach(function (s) {
-      cur = cur ? cur + ' ' + s.trim() : s.trim();
-      if (countWords(cur) >= 38) {
-        groups.push(cur);
-        cur = '';
-      }
-    });
-    if (cur) {
-      if (groups.length && countWords(cur) < 14) groups[groups.length - 1] += ' ' + cur;else groups.push(cur);
-    }
-    var MAX = 24;
-    var partial = groups.length > MAX;
-    if (partial) groups = groups.slice(0, MAX);
-    var t = 0;
-    var segments = groups.map(function (g, i) {
-      var words = countWords(g);
-      var dur = words / WPM * 60;
-      var start = t;
-      t += dur;
-      var kw = keywords(g, 4);
-      var mood = moodFor(g, i);
-      var terms = [];
-      if (kw.length >= 2) terms.push(kw[0] + ' ' + kw[1]);else if (kw.length === 1) terms.push(kw[0]);
-      if (kw.length >= 4) terms.push(kw[2] + ' ' + kw[3]);else if (kw.length >= 3) terms.push(kw[2] + ' close up');
-      terms.push(MOOD_TERMS[mood]);
-      terms = terms.filter(function (x, j) {
-        return x && terms.indexOf(x) === j;
-      }).slice(0, 3);
-      return {
-        id: i + 1,
-        script_text: g,
-        start_time: fmtTime(start),
-        end_time: fmtTime(t),
-        search_terms: terms,
-        clip_duration_seconds: Math.min(15, Math.max(4, Math.round(dur * 0.4))),
-        mood: mood
-      };
-    });
-    var top = keywords(script, 2);
-    var title = top.length >= 2 ? 'The ' + top[0].charAt(0).toUpperCase() + top[0].slice(1) + ' and the ' + top[1].charAt(0).toUpperCase() + top[1].slice(1) : 'Untitled Essay';
-    return {
-      video_title_suggestion: title,
-      estimated_runtime_seconds: Math.round(t),
-      segments: segments,
-      partial: partial
-    };
-  }
-  var SAMPLE_SCRIPT = ['Every city has an hour when it belongs to nobody. The shops are shuttered, the trains run empty, and the streetlights hum their one long note over wet asphalt. This is the hour the essay begins.', 'I used to think discipline meant noise — alarms, deadlines, a coach barking counts in a cold gym. But the strongest people I ever filmed were quiet. A boxer wrapping his hands in silence. A baker flouring the bench before the ovens wake. Their fight happened long before anyone watched.', 'Writing is the same kind of fight. You sit at a small desk under a small lamp and you go the full twelve rounds with a blank page. Nobody cheers. The page does not care. You show up anyway, night after night, and the work accumulates like snowfall on a windowsill.', 'Stock footage gets a bad reputation, and some of it is earned. But choose carefully and the borrowed image becomes confession. Rain on a train window is every leaving you never explained. A kitchen light at three in the morning is every doubt you ever fed.', 'So this is the method. Write the truest sentence you can. Find the picture that admits it. Cut until only the fight remains — the quiet one, the one worth filming.'].join('\n\n');
-  window.QFCEngine = {
-    WPM: WPM,
-    countWords: countWords,
-    fmtTime: fmtTime,
-    map: map,
-    SAMPLE_SCRIPT: SAMPLE_SCRIPT
-  };
-})();
-})(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/quiet-fight-club/engine.js", error: String((e && e.message) || e) }); }
-
-// ui_kits/quiet-fight-club/screens.jsx
-try { (() => {
-// Screens: EmptyDesk (landing), Working (loading), EngineError.
-const {
-  Button,
-  ScriptTextarea,
-  Icon,
-  ProgressBar
-} = window.QuietFightClubDesignSystem_fae847;
-const E = window.QFCEngine;
-function Wordmark() {
-  return /*#__PURE__*/React.createElement("header", {
-    className: "qfc-page__header"
-  }, /*#__PURE__*/React.createElement("h1", {
-    className: "qfc-wordmark"
-  }, "Quiet Fight Club"), /*#__PURE__*/React.createElement("p", {
-    className: "qfc-tagline"
-  }, "Turn your script into a shot list."));
-}
-function EmptyDesk({
-  script,
-  onScriptChange,
-  onMap,
-  onSample,
-  error
-}) {
-  const words = E.countWords(script);
-  const runtime = E.fmtTime(words / E.WPM * 60);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "qfc-page",
-    "data-screen-label": "Empty Desk"
-  }, /*#__PURE__*/React.createElement(Wordmark, null), /*#__PURE__*/React.createElement(ScriptTextarea, {
-    value: script,
-    onChange: onScriptChange,
-    minHeight: 300
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-deskmeta"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "qfc-deskmeta__counts"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "file-text",
-    size: 13
-  }), words.toLocaleString(), " ", words === 1 ? 'word' : 'words', " \xB7 \u2248", runtime, " narration"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "qfc-textlink",
-    onClick: onSample
-  }, "Try a sample script")), error ? /*#__PURE__*/React.createElement("p", {
-    className: "qfc-fieldnote",
-    role: "alert"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "circle-alert",
-    size: 14
-  }), error) : null, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-deskaction"
-  }, /*#__PURE__*/React.createElement(Button, {
-    size: "lg",
-    icon: "sparkles",
-    onClick: onMap
-  }, "Map My Visuals")));
-}
-const WORKING_LINES = ['Reading your script…', 'Breaking it into scenes…', 'Finding your footage…'];
-function Working() {
-  const [lineIdx, setLineIdx] = React.useState(0);
-  const [progress, setProgress] = React.useState(0.06);
-  React.useEffect(() => {
-    const lineTimer = setInterval(() => {
-      setLineIdx(i => Math.min(i + 1, WORKING_LINES.length - 1));
-    }, 1300);
-    const progTimer = setInterval(() => {
-      setProgress(p => Math.min(0.92, p + (0.92 - p) * 0.18));
-    }, 220);
-    return () => {
-      clearInterval(lineTimer);
-      clearInterval(progTimer);
-    };
-  }, []);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "qfc-page qfc-page--center",
-    "data-screen-label": "Working"
-  }, /*#__PURE__*/React.createElement(Wordmark, null), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-working",
-    role: "status"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "qfc-working__line",
-    key: lineIdx
-  }, WORKING_LINES[lineIdx]), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-working__bar"
-  }, /*#__PURE__*/React.createElement(ProgressBar, {
-    value: progress
-  }))));
-}
-function EngineError({
-  onRetry,
-  onBack
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    className: "qfc-page qfc-page--center",
-    "data-screen-label": "Engine Error"
-  }, /*#__PURE__*/React.createElement(Wordmark, null), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-enginerror",
-    role: "alert"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "circle-alert",
-    size: 20,
-    color: "var(--danger-text)"
-  }), /*#__PURE__*/React.createElement("p", {
-    className: "qfc-enginerror__msg"
-  }, "The mapping engine didn't answer. Wait a moment and try again."), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-enginerror__actions"
-  }, /*#__PURE__*/React.createElement(Button, {
-    icon: "rotate-ccw",
-    onClick: onRetry
-  }, "Retry"), /*#__PURE__*/React.createElement(Button, {
-    variant: "ghost",
-    onClick: onBack
-  }, "Back to the script"))));
-}
-Object.assign(window, {
-  Wordmark,
-  EmptyDesk,
-  Working,
-  EngineError,
-  WORKING_LINES
-});
-})(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/quiet-fight-club/screens.jsx", error: String((e && e.message) || e) }); }
-
-// ui_kits/quiet-fight-club/shotlist.jsx
-try { (() => {
-// Shot list: sticky SummaryBar + the manuscript-card board.
-const {
-  Button,
-  ManuscriptCard,
-  ProgressBar
-} = window.QuietFightClubDesignSystem_fae847;
-const Eng = window.QFCEngine;
-const MOOD_TONES = {
-  tense: 'oxblood',
-  wistful: 'neutral',
-  quiet: 'neutral',
-  resolute: 'ember',
-  reflective: 'neutral',
-  hopeful: 'ember'
-};
-function SummaryBar({
-  result,
-  foundCount,
-  onCopy,
-  copied,
-  onNewScript,
-  confirmingNew,
-  onConfirmNew,
-  onCancelNew
-}) {
-  const total = result.segments.length;
-  return /*#__PURE__*/React.createElement("div", {
-    className: "qfc-summary",
-    "data-comment-anchor": "summary-bar"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-summary__inner"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-summary__facts"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "qfc-summary__title"
-  }, result.video_title_suggestion), /*#__PURE__*/React.createElement("span", {
-    className: "qfc-summary__meta"
-  }, total, " segments \xB7 \u2248", Eng.fmtTime(result.estimated_runtime_seconds), " runtime")), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-summary__progress"
-  }, /*#__PURE__*/React.createElement(ProgressBar, {
-    value: total ? foundCount / total : 0,
-    label: `${foundCount} of ${total} segments clipped`
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "qfc-summary__actions"
-  }, confirmingNew ? /*#__PURE__*/React.createElement("span", {
-    className: "qfc-summary__confirm"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "qfc-summary__confirmtext"
-  }, "Clear this map?"), /*#__PURE__*/React.createElement(Button, {
-    variant: "danger",
-    size: "sm",
-    onClick: onConfirmNew
-  }, "Clear it"), /*#__PURE__*/React.createElement(Button, {
-    variant: "ghost",
-    size: "sm",
-    onClick: onCancelNew
-  }, "Keep it")) : /*#__PURE__*/React.createElement("span", {
-    className: "qfc-summary__btns"
-  }, /*#__PURE__*/React.createElement(Button, {
-    variant: "secondary",
-    size: "sm",
-    icon: copied ? 'check' : 'copy',
-    onClick: onCopy
-  }, copied ? 'Copied' : 'Copy for Notion'), /*#__PURE__*/React.createElement(Button, {
-    variant: "ghost",
-    size: "sm",
-    icon: "rotate-ccw",
-    onClick: onNewScript
-  }, "Start a new script")))));
-}
-function ShotList({
-  result,
-  found,
-  onFoundChange,
-  onMapRest,
-  dealt
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    className: "qfc-board",
-    "data-screen-label": "Shot List"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "qfc-board__cards"
-  }, result.segments.map((seg, i) => /*#__PURE__*/React.createElement(ManuscriptCard, {
-    key: seg.id,
-    index: seg.id,
-    startTime: seg.start_time,
-    endTime: seg.end_time,
-    excerpt: seg.script_text,
-    mood: seg.mood,
-    moodTone: MOOD_TONES[seg.mood] || 'neutral',
-    clipDurationSeconds: seg.clip_duration_seconds,
-    terms: seg.search_terms,
-    found: !!found[seg.id],
-    onFoundChange: v => onFoundChange(seg.id, v),
-    className: dealt ? 'qfc-deal' : '',
-    style: dealt ? {
-      animationDelay: Math.min(i, 12) * 60 + 'ms'
-    } : null
-  }))), result.partial ? /*#__PURE__*/React.createElement("div", {
-    className: "qfc-board__partial"
-  }, /*#__PURE__*/React.createElement("p", null, "The map came back unfinished \u2014 this is everything that arrived."), /*#__PURE__*/React.createElement(Button, {
-    variant: "secondary",
-    icon: "arrow-right",
-    onClick: onMapRest
-  }, "Map the rest")) : null);
-}
-function buildMarkdown(result, found) {
-  const lines = ['# ' + result.video_title_suggestion, '', `Total: ${result.segments.length} segments · ≈${Eng.fmtTime(result.estimated_runtime_seconds)} runtime`, '', '| # | Time | Script | Mood | Clip | Search terms | Found |', '| --- | --- | --- | --- | --- | --- | --- |'];
-  result.segments.forEach(s => {
-    lines.push(`| ${String(s.id).padStart(2, '0')} | ${s.start_time}–${s.end_time} | ${s.script_text.replace(/\|/g, '\\|')} | ${s.mood} | ~${s.clip_duration_seconds}s | ${s.search_terms.join(' · ')} | ${found[s.id] ? '✓' : ''} |`);
-  });
-  return lines.join('\n');
-}
-Object.assign(window, {
-  SummaryBar,
-  ShotList,
-  buildMarkdown,
-  MOOD_TONES
-});
-})(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/quiet-fight-club/shotlist.jsx", error: String((e && e.message) || e) }); }
 
 __ds_ns.Button = __ds_scope.Button;
-
 __ds_ns.FoundCheckbox = __ds_scope.FoundCheckbox;
-
 __ds_ns.Icon = __ds_scope.Icon;
-
 __ds_ns.ProgressBar = __ds_scope.ProgressBar;
-
 __ds_ns.SearchChip = __ds_scope.SearchChip;
-
 __ds_ns.Stamp = __ds_scope.Stamp;
-
 __ds_ns.ManuscriptCard = __ds_scope.ManuscriptCard;
-
 __ds_ns.ScriptTextarea = __ds_scope.ScriptTextarea;
 
 })();
