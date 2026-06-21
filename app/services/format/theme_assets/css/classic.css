@@ -1,0 +1,27 @@
+@font-face {
+  font-family: "BodySerif";
+  src: url("../fonts/EBGaramond-Regular.ttf");
+  font-weight: normal; font-style: normal;
+}
+@font-face {
+  font-family: "BodySerif";
+  src: url("../fonts/EBGaramond-Italic.ttf");
+  font-weight: normal; font-style: italic;
+}
+body {
+  font-family: "BodySerif", "Georgia", serif;
+  font-size: 1em; line-height: 1.5;
+  margin: 1.2em 1.4em; text-align: justify; hyphens: auto;
+}
+h1, h2 {
+  font-family: "BodySerif", serif; font-weight: normal;
+  text-align: center; margin: 2em 0 1.2em; page-break-before: always;
+  letter-spacing: 0.04em;
+}
+p { margin: 0; text-indent: 1.4em; }
+p:first-of-type, h1 + p, h2 + p { text-indent: 0; }
+p:first-of-type::first-letter {
+  font-size: 3.2em; line-height: 0.9; float: left;
+  padding: 0.02em 0.06em 0 0; font-weight: normal;
+}
+blockquote { margin: 1em 2em; font-style: italic; }

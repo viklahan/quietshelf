@@ -1,0 +1,7 @@
+@font-face { font-family: "BodySerif"; src: url("../fonts/SourceSerif4-Regular.ttf"); font-weight: normal; font-style: normal; }
+@font-face { font-family: "BodySerif"; src: url("../fonts/SourceSerif4-Italic.ttf"); font-weight: normal; font-style: italic; }
+body { font-family: "BodySerif", Georgia, serif; font-size: 1em; line-height: 1.55; margin: 1.3em 1.5em; text-align: left; }
+h1, h2 { font-family: "BodySerif", serif; font-weight: 600; text-align: left; margin: 2em 0 1em; page-break-before: always; letter-spacing: -0.01em; }
+p { margin: 0; text-indent: 1.2em; }
+p:first-of-type, h1 + p, h2 + p { text-indent: 0; }
+blockquote { margin: 1em 1.6em; border-left: 2px solid #ccc; padding-left: 0.8em; }
