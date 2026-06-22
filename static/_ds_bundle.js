@@ -366,6 +366,32 @@ const CHIP_CSS = `
   border-left: 1px solid rgba(197, 137, 59, 0.35);
   padding-left: 7px;
 }
+.qs-chip--edit { cursor: text; }
+.qs-chip__go {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-quiet);
+}
+.qs-chip--edit:hover .qs-chip__go,
+.qs-chip__go:hover { color: var(--ember-500); }
+.qs-chip__input {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 1;
+  color: var(--text-body);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 4ch;
+}
+.qs-chip__input:focus { outline: none; }
+.qs-chip--edit:focus-within {
+  border-color: var(--edge-strong);
+  background: var(--surface-pressed);
+}
 `;
 function injectChipCss() {
   if (typeof document === 'undefined' || document.getElementById('qs-chip-css')) return;
@@ -379,11 +405,41 @@ function SearchChip({
   best = false,
   href,
   onClick,
+  onTermChange,
   style,
   className
 }) {
   injectChipCss();
   const url = href || `https://www.pexels.com/search/videos/${encodeURIComponent(term)}/`;
+  // Editable variant: a text field styled like the chip; the search link
+  // follows whatever the writer types.
+  if (onTermChange) {
+    return /*#__PURE__*/React.createElement("span", {
+      className: `qs-chip qs-chip--edit${best ? ' qs-chip--best' : ''}${className ? ' ' + className : ''}`,
+      style: style
+    }, /*#__PURE__*/React.createElement("a", {
+      className: "qs-chip__go",
+      href: url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      onClick: onClick,
+      "aria-label": `Search stock footage for ${term}`
+    }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
+      name: "search",
+      size: 13,
+      className: "qs-chip__icon"
+    })), /*#__PURE__*/React.createElement("input", {
+      className: "qs-chip__input",
+      type: "text",
+      value: term,
+      spellCheck: false,
+      size: Math.max(4, (term || '').length),
+      onChange: e => onTermChange(e.target.value),
+      "aria-label": "Edit search term"
+    }), best ? /*#__PURE__*/React.createElement("span", {
+      className: "qs-chip__best-tag"
+    }, "best bet") : null);
+  }
   return /*#__PURE__*/React.createElement("a", {
     className: `qs-chip${best ? ' qs-chip--best' : ''}${className ? ' ' + className : ''}`,
     href: url,
@@ -586,6 +642,7 @@ function ManuscriptCard({
   moodTone = 'neutral',
   clipDurationSeconds,
   terms = [],
+  onTermChange,
   found = false,
   onFoundChange,
   style,
@@ -613,9 +670,10 @@ function ManuscriptCard({
   }, excerpt), /*#__PURE__*/React.createElement("div", {
     className: "qs-mcard__terms"
   }, terms.map((term, i) => /*#__PURE__*/React.createElement(__ds_scope.SearchChip, {
-    key: term + i,
+    key: i,
     term: term,
-    best: i === 0
+    best: i === 0,
+    onTermChange: onTermChange ? (v => onTermChange(i, v)) : undefined
   }))), /*#__PURE__*/React.createElement(__ds_scope.FoundCheckbox, {
     checked: found,
     onChange: onFoundChange

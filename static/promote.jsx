@@ -77,6 +77,16 @@ function Promote() {
   }
 
   function toggle(i, v) { setFound((p) => ({ ...p, [i]: v })); }
+
+  /* Edit one search term in place. The card's search links read straight from
+     these terms, so an edit re-points the stock-footage search immediately. */
+  function editTerm(cardIdx, termIdx, value) {
+    setSegs((prev) => prev.map((s, i) =>
+      i === cardIdx
+        ? { ...s, terms: s.terms.map((t, j) => (j === termIdx ? value : t)) }
+        : s
+    ));
+  }
   const doneCount = segs.filter((s) => found[s.index]).length;
 
   function notionText() {
@@ -131,6 +141,7 @@ function Promote() {
                 moodTone={s.moodTone}
                 clipDurationSeconds={s.clipDurationSeconds}
                 terms={s.terms}
+                onTermChange={(ti, v) => editTerm(idx, ti, v)}
                 found={!!found[s.index]}
                 onFoundChange={(v) => toggle(s.index, v)}
               />

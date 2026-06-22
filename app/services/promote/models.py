@@ -13,7 +13,7 @@ class Segment(BaseModel):
     script_text: str
     start_time: str
     end_time: str
-    search_terms: list[str] = Field(..., min_length=3, max_length=3)
+    search_terms: list[str] = Field(..., min_length=3, max_length=8)
     clip_duration_seconds: int
     mood: str
 

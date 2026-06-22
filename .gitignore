@@ -13,3 +13,6 @@ venv/
 # Local uvicorn run logs
 _ui_out.log
 _ui_err.log
+
+# Playwright MCP run artifacts
+.playwright-mcp/

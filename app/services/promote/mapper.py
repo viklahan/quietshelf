@@ -14,7 +14,7 @@ Break the ENTIRE script into visual segments (every 1-3 sentences, wherever the 
 - id: sequential integer starting at 1
 - script_text: the exact sentences from the script (do not paraphrase)
 - start_time and end_time: cumulative narration timing as "M:SS" strings
-- search_terms: exactly 3 stock-footage search terms, ranked best first. Terms must be optimized for stock libraries like Pexels: simple, concrete, describing actions/settings/emotions ("man walking alone city night"), never abstract concepts ("loneliness of modern existence"). Prefer terms with high stock availability - avoid hyper-specific scenes that won't exist.
+- search_terms: exactly 6 stock-footage search terms, ranked best first. Terms must be optimized for stock libraries like Pexels: simple, concrete, describing actions/settings/emotions ("man walking alone city night"), never abstract concepts ("loneliness of modern existence"). Prefer terms with high stock availability - avoid hyper-specific scenes that won't exist. Give a range of distinct angles (subject, setting, mood, action) so the writer has real choices.
 - clip_duration_seconds: integer estimate based on narration pace
 - mood: one or two lowercase words (e.g., "hopeful", "tense", "warm")
 
