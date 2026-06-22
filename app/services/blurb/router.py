@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app import config
 from app.deps import guard
 from app.http_errors import llm_error_to_response
-from app.providers import JSONParseError, ProviderError
+from app.providers import JSONParseError, ProviderConfigError, ProviderError
 from app.services.blurb.extract import UnsupportedFormat, extract_text
 from app.services.blurb.generator import generate_blurb
 from app.services.blurb.models import BlurbResult, Length, Tone
@@ -50,7 +50,7 @@ async def blurb(
     logger.info("blurb_request words=%d tone=%s length=%s", len(manuscript.split()), tone.value, length.value)
     try:
         return generate_blurb(manuscript, tone=tone, length=length)
-    except (JSONParseError, ProviderError) as exc:
+    except (JSONParseError, ProviderConfigError, ProviderError) as exc:
         return llm_error_to_response(
             exc,
             failure_code="generation_failed",

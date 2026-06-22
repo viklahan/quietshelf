@@ -9,3 +9,7 @@ venv/
 *.shotlist.md
 
 *.egg-info/
+
+# Local uvicorn run logs
+_ui_out.log
+_ui_err.log

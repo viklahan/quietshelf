@@ -12,6 +12,7 @@ DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
     "groq": "llama-3.3-70b-versatile",
     "ollama": "qwen2.5:latest",
+    "openrouter": "openai/gpt-oss-20b:free",
 }
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_RATE_LIMIT = 20  # requests per hour per IP

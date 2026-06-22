@@ -18,12 +18,25 @@ class OpenRouterProvider(Provider):
     name = "openrouter"
 
     def validate_config(self) -> None:
-        if not config.openrouter_api_key():
+        key = config.openrouter_api_key()
+        if not key:
             raise ProviderConfigError(
                 "OPENROUTER_API_KEY is not set. Get a free key at "
                 "https://openrouter.ai/keys, put it in your .env file, and "
                 "restart. Or switch providers with LLM_PROVIDER=gemini|groq|ollama."
             )
+        # A key that isn't pure ASCII can't go in an HTTP Authorization header;
+        # it's almost always a paste accident (an inline comment, smart quotes,
+        # or an arrow copied from the website). Fail fast at startup with a clear
+        # cause instead of an opaque UnicodeEncodeError deep in the HTTP layer.
+        try:
+            key.encode("ascii")
+        except UnicodeEncodeError:
+            raise ProviderConfigError(
+                "OPENROUTER_API_KEY contains non-ASCII characters and looks "
+                "corrupted - re-copy just the key (sk-or-...) from "
+                "https://openrouter.ai/keys, with no trailing comment or quotes."
+            ) from None
 
     def generate(
         self, system_prompt: str, user_content: str, json_mode: bool = True
@@ -48,4 +61,11 @@ class OpenRouterProvider(Provider):
             raise ProviderTimeout(str(exc)) from exc
         except (APIError, httpx.TimeoutException) as exc:
             raise ProviderError(f"OpenRouter API error: {exc}") from exc
+        except UnicodeEncodeError as exc:
+            raise ProviderConfigError(
+                "OPENROUTER_API_KEY contains non-ASCII characters and looks "
+                "corrupted - re-copy just the key from https://openrouter.ai/keys."
+            ) from exc
+        except Exception as exc:  # safety net: a writer must never see a raw 500
+            raise ProviderError(f"OpenRouter request failed: {exc}") from exc
         return response.choices[0].message.content or ""

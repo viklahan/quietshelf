@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.providers import (
     JSONParseError,
+    ProviderConfigError,
     ProviderError,
     ProviderRateLimited,
     ProviderTimeout,
@@ -22,6 +23,18 @@ def llm_error_to_response(
 ) -> JSONResponse:
     """Translate a known LLM-path exception into a JSONResponse. Re-raise if
     the exception is not one we handle."""
+    if isinstance(exc, ProviderConfigError):
+        logger.error("provider_config_error detail=%s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "service_unconfigured",
+                "message": (
+                    "The AI service isn't set up correctly. If you're "
+                    "self-hosting, check the API key in your .env."
+                ),
+            },
+        )
     if isinstance(exc, JSONParseError):
         return JSONResponse(
             status_code=502, content={"error": failure_code, "message": failure_msg}

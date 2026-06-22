@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app import config
 from app.deps import guard
 from app.http_errors import llm_error_to_response
-from app.providers import JSONParseError, ProviderError
+from app.providers import JSONParseError, ProviderConfigError, ProviderError
 from app.services.promote.mapper import map_script
 from app.services.promote.models import PromoteRequest, ShotList
 
@@ -34,7 +34,7 @@ def promote(body: PromoteRequest, request: Request, _: None = Depends(guard)):
     logger.info("promote_request word_count=%d provider=%s", word_count, config.provider_name())
     try:
         return map_script(body.script)
-    except (JSONParseError, ProviderError) as exc:
+    except (JSONParseError, ProviderConfigError, ProviderError) as exc:
         return llm_error_to_response(
             exc,
             failure_code="generation_failed",
