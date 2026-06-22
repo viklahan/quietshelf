@@ -35,6 +35,8 @@ def model_name() -> str:
 def gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY", "").strip()
 
+def openrouter_api_key() -> str:
+    return os.getenv("OPENROUTER_API_KEY", "").strip()
 
 def groq_api_key() -> str:
     return os.getenv("GROQ_API_KEY", "").strip()
