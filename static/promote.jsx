@@ -92,7 +92,13 @@ function Promote() {
     return (
       <div className="qs-page">
         <Becoming
-          lines={['Reading your piece…', 'Breaking it into scenes…', 'Mapping the visuals…']}
+          lines={[
+            'Reading your piece…',
+            'Breaking it into scenes…',
+            'Mapping the visuals…',
+            'Choosing search terms…',
+            'Still working — free models can be slow…',
+          ]}
           sub="Mapping your footage."
           duration={3600}
           onDone={() => {}}

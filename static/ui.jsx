@@ -84,15 +84,19 @@ function FinishedBook({ title, author }) {
 function Becoming({ lines, sub, onDone, duration = 4200 }) {
   const [i, setI] = React.useState(0);
   React.useEffect(() => {
+    // Keep the lines moving for as long as the work actually runs. Real calls
+    // (free-tier LLMs especially) usually outlast `duration`, so cycle the
+    // lines instead of freezing on the last one — the parent unmounts us when
+    // the request resolves. onDone stays a soft, optional auto-advance.
     const per = Math.max(900, Math.floor(duration / lines.length));
-    const step = setInterval(() => setI((p) => Math.min(p + 1, lines.length - 1)), per);
-    const finish = setTimeout(() => onDone && onDone(), duration);
-    return () => { clearInterval(step); clearTimeout(finish); };
+    const step = setInterval(() => setI((p) => p + 1), per);
+    const finish = onDone ? setTimeout(() => onDone(), duration) : null;
+    return () => { clearInterval(step); if (finish) clearTimeout(finish); };
   }, []);
   return (
     <div className="qs-becoming" role="status" aria-live="polite">
       <span className="qs-becoming__lamp" aria-hidden="true"></span>
-      <p className="qs-becoming__line" key={i}>{lines[i]}</p>
+      <p className="qs-becoming__line" key={i}>{lines[i % lines.length]}</p>
       {sub ? <p className="qs-becoming__sub">{sub}</p> : null}
     </div>
   );

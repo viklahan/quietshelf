@@ -167,7 +167,12 @@ function Format() {
     return (
       <div className="qs-page qs-page--narrow">
         <Becoming
-          lines={['Reading your story…', 'Setting your words…', 'Binding the pages…']}
+          lines={[
+            'Reading your story…',
+            'Setting your words…',
+            'Binding the pages…',
+            'Almost bound…',
+          ]}
           sub="This takes a moment. Stay a while."
           duration={4200}
           onDone={() => {}}

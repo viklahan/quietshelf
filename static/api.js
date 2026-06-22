@@ -62,7 +62,7 @@
 
     const resp = await fetch(BASE + '/api/blurb', { method: 'POST', body: fd });
     if (!resp.ok) {
-      throw await friendlyError(resp, 'The copywriter returned an unreadable result. Try again.');
+      throw await friendlyError(resp, 'Something went wrong reaching the copywriter. Try again in a moment.');
     }
     return await resp.json();
   }
@@ -75,7 +75,7 @@
       body: JSON.stringify({ script }),
     });
     if (!resp.ok) {
-      throw await friendlyError(resp, 'The mapping engine returned an unreadable result. Try again.');
+      throw await friendlyError(resp, 'Something went wrong reaching the mapping engine. Try again in a moment.');
     }
     return await resp.json();
   }
