@@ -22,3 +22,19 @@ class ShotList(BaseModel):
     video_title_suggestion: str
     estimated_runtime_seconds: int
     segments: list[Segment]
+
+
+# --- per-chunk mapping ----------------------------------------------------
+# The script is mapped one bounded excerpt at a time. Each chunk returns just
+# its segments (no global start/end times - those are computed cumulatively
+# while stitching, which the model is unreliable at and would only slow down).
+class ChunkSegment(BaseModel):
+    script_text: str
+    search_terms: list[str] = Field(..., min_length=3, max_length=8)
+    clip_duration_seconds: int
+    mood: str
+
+
+class ChunkResult(BaseModel):
+    video_title_suggestion: str = ""
+    segments: list[ChunkSegment]
