@@ -19,7 +19,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from app.providers import ProviderRateLimited, generate_json
+from app.providers import JSONParseError, ProviderRateLimited, generate_json
 from app.services.promote.models import ChunkResult, ChunkSegment, Segment, ShotList
 
 logger = logging.getLogger("quietshelf.promote")
@@ -120,12 +120,14 @@ def _map_chunk(chunk: str) -> ChunkResult:
 
 
 def _try_map_chunk(chunk: str) -> ChunkResult | None:
-    """Best-effort map; returns None instead of raising so one bad chunk never
-    fails the whole request."""
+    """Returns None (-> local fallback) only when the model RESPONDED but its
+    output was unparseable. Infrastructure failures (rate limit, upstream error,
+    bad key) propagate so the writer gets an honest "try again" instead of a
+    whole script silently degraded to keyword-only mapping."""
     try:
         return _map_chunk(chunk)
-    except Exception as exc:  # noqa: BLE001 - resilience boundary
-        logger.warning("chunk_map_failed error=%s", type(exc).__name__)
+    except JSONParseError:
+        logger.warning("chunk_parse_failed -> local fallback")
         return None
 
 
@@ -190,6 +192,9 @@ def map_script(script: str) -> ShotList:
                 )
             )
             cumulative += duration
+
+    if not title and segments:  # last resort: the opening few words
+        title = " ".join(segments[0].script_text.split()[:6]).rstrip(".,;:!?")
 
     return ShotList(
         video_title_suggestion=title or "Your video",

@@ -43,6 +43,11 @@ class GeminiProvider(Provider):
                 config=genai_types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     response_mime_type="application/json" if json_mode else None,
+                    # This is structured extraction / short-form copy, not
+                    # reasoning - Gemini 2.5 Flash's default "thinking" only adds
+                    # latency here, so turn it off. (Flash/Flash-Lite support
+                    # thinking_budget=0; 2.5-pro does not.)
+                    thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
                 ),
             )
         except genai_errors.APIError as exc:
