@@ -289,6 +289,17 @@
 .qs-file__name .qs-file__ico { color: var(--ember-400); }
 .qs-file__sub { font-family: var(--font-mono); font-size: var(--fs-meta); letter-spacing: var(--ls-meta); color: var(--text-faint); }
 
+/* "or" divider (Blurb: paste ── or ── bring the file) */
+.qs-or {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: var(--space-5) 0;
+  font-family: var(--font-mono); font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-faint);
+}
+.qs-or::before, .qs-or::after {
+  content: ""; flex: 1; height: 1px; background: var(--edge-strong);
+}
+
 /* fields ----------------------------------------------------------- */
 .qs-fields { display: grid; gap: var(--space-5); grid-template-columns: 1fr; }
 @media (min-width: 560px) { .qs-fields--two { grid-template-columns: 1fr 1fr; } }

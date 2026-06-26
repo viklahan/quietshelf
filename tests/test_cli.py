@@ -57,6 +57,42 @@ def test_format_command_unsupported_file_fails_friendly(tmp_path):
     assert result.exception is None or isinstance(result.exception, SystemExit)  # no raw traceback
 
 
+def test_storymap_command_writes_json(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    import app.cli as cli
+    from app.services.storymap.models import Character, Relationship, StoryMap
+
+    fake = StoryMap(
+        story_detected=True,
+        confidence="high",
+        characters=[
+            Character(id="c1", name="Jack", role="protagonist", importance=5,
+                      relationships=[Relationship(with_="c2", type="sibling", note="raised together")]),
+            Character(id="c2", name="Mara", role="supporting", importance=2),
+        ],
+    )
+    monkeypatch.setattr(cli, "map_story", lambda text: fake)
+
+    script = tmp_path / "story.txt"
+    script.write_text("Jack and Mara grew up together in a small grey town by the sea.", encoding="utf-8")
+    out = tmp_path / "map.json"
+    result = runner.invoke(app, ["storymap", str(script), "--out", str(out)])
+    assert result.exit_code == 0, result.stdout
+    assert out.is_file()
+    text = out.read_text(encoding="utf-8")
+    assert "story_detected" in text
+    assert '"with": "c2"' in text  # relationship serialized with the alias
+
+
+def test_storymap_command_unsupported_file_fails_friendly(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    bad = tmp_path / "thing.pdf"
+    bad.write_bytes(b"%PDF-1.4")
+    result = runner.invoke(app, ["storymap", str(bad)])
+    assert result.exit_code != 0
+    assert result.exception is None or isinstance(result.exception, SystemExit)  # no raw traceback
+
+
 def test_blurb_command_unsupported_file_fails_friendly(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     bad = tmp_path / "thing.pdf"

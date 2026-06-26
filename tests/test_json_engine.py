@@ -77,3 +77,32 @@ def test_generate_json_schema_violation_triggers_retry_then_fails(monkeypatch):
     _patch_provider(monkeypatch, '{"wrong": "shape"}')
     with pytest.raises(JSONParseError):
         generate_json("system", "user", _Model)
+
+
+# --- repair ladder --------------------------------------------------------
+def test_extract_repairs_trailing_comma():
+    assert _extract_json('{"a": 1, "b": "x",}') == {"a": 1, "b": "x"}
+
+
+def test_extract_repairs_trailing_comma_in_nested_array():
+    assert _extract_json('{"a": 1, "b": "x", "c": [1, 2,]}') == {
+        "a": 1, "b": "x", "c": [1, 2]
+    }
+
+
+def test_extract_strips_stray_control_characters():
+    # A NUL byte sneaks into otherwise-valid JSON; repair removes it.
+    assert _extract_json('{"a": 1,\x00 "b": "x"}') == {"a": 1, "b": "x"}
+
+
+def test_extract_still_raises_on_unrecoverable_garbage():
+    with pytest.raises(ValueError):
+        _extract_json("I'm sorry, I can't do that.")
+
+
+def test_generate_json_succeeds_via_repair_without_retry(monkeypatch):
+    # Trailing comma alone must be fixed in-place, not cost a second model call.
+    calls = _patch_provider(monkeypatch, '{"a": 1, "b": "x",}')
+    result = generate_json("system", "user", _Model)
+    assert result == _Model(a=1, b="x")
+    assert len(calls["systems"]) == 1  # repaired on the first response

@@ -1,0 +1,128 @@
+How Quiet Shelf works
+
+The idea in one sentence
+
+A writer hands over a manuscript → Quiet Shelf calls a free or fully-local AI
+model → they get back finished, sellable, promotable things: a themed EPUB,
+marketing copy, a stock-footage shot list, and a character map of their story.
+
+---
+
+The shape of the app
+
+One FastAPI app (app/main.py) + one Typer/Rich CLI (app/cli.py), serving four
+INDEPENDENT services plus the static frontend. One container, one port, no DB,
+no queue, no auth service. The app serves static/index.html at / and the API at
+/api/*.
+
+  Browser / CLI
+       │
+       ▼
+  ┌────────────────────────────────────────────────┐
+  │  FastAPI (app/main.py)                          │
+  │  mounts four routers + /api/health + static UI  │
+  └───────┬───────────┬───────────┬─────────────────┘
+          │           │           │           │
+          ▼           ▼           ▼           ▼
+       Format       Blurb      Promote     Story Map
+   (no AI)                                 + Imagine
+
+Hard rule: each app/services/* package is independent and must NEVER import
+another service. Shared code lives only in:
+  - app/providers/   — the LLM + JSON layer (provider selection, parsing)
+  - app/ingest.py    — file reading (DOCX/RTF/TXT → text), UnsupportedFormat
+  - app infra        — config, deps (access code), http_errors, ratelimit
+
+---
+
+The four services
+
+1. Format  (app/services/format/)
+   Manuscript (DOCX/RTF/TXT) → a beautiful, themed EPUB. Uses NO AI at all —
+   pure conversion (pandoc) + an embedded theme font. EPUB is reflowable, so we
+   preserve structure/styling/images but the layout is not pixel-perfect.
+   CLI: quiet-shelf format book.docx --title ... --author ... --theme cozy
+
+2. Blurb  (app/services/blurb/)
+   Manuscript → back-cover copy, taglines, and store keywords. Tone + length
+   options. Calls the model, parses strict JSON into a Pydantic model.
+   CLI: quiet-shelf blurb book.docx --tone warm --length medium
+
+3. Promote  (app/services/promote/)
+   A written piece (100–3000 words) → a stock-footage shot list for a promo
+   video: timecoded segments, each with concrete Pexels-style search terms, a
+   clip duration, and a mood. The script is split into ~200-word chunks, mapped
+   CONCURRENTLY (PROMOTE_CONCURRENCY, default 6) and stitched with locally
+   computed cumulative timing. A chunk that won't parse drops to a local keyword
+   fallback; rate-limit / upstream errors propagate honestly (429/502) instead
+   of degrading silently.
+   CLI: quiet-shelf promote script.txt --out shotlist.json
+
+4. Story Map  (app/services/storymap/)  — the "mirror"
+   Manuscript → characters + relationships. It REFLECTS the text and never
+   authors or invents. Two passes:
+     POST /api/storymap/scan — Pass 1, fast entity names for the live loader
+     POST /api/storymap/map  — Pass 2, the full structured map
+   Anti-fabrication: if the model claims a story but yields no usable
+   characters, the engine overrules it to story_detected=false. Non-narrative
+   input returns an honest empty map, never a fabricated cast.
+
+   The Imagine door  (POST /api/storymap/imagine) — "no dead ends"
+   The opt-in escape from the mirror. The writer EXPLICITLY asks the engine to
+   invent. Three modes:
+     seed    — a small starter cast
+     full    — a complete imagined map
+     prompts — generative questions (no invented people)
+   Optional steers: nudge (premise/genre/tone), existing (cast to build on),
+   reroll (a fresh, different take). Integrity is preserved: every imagined
+   result is stamped fabricated=true (the engine forces the flag, never trusts
+   the model), while the mirror /map stays fabricated=false.
+   CLI: quiet-shelf storymap book.docx --out map.json
+        quiet-shelf imagine notes.txt --mode seed --nudge "cozy mystery"
+
+---
+
+Providers (free / open only)
+
+Selected by the LLM_PROVIDER env var, resolved in app/providers/:
+  - gemini      → google-genai SDK → Gemini free tier   (DEFAULT)
+  - groq        → groq SDK → Groq free tier (Llama 3.x)
+  - ollama      → httpx → localhost:11434 (fully local, nothing leaves the box)
+  - openrouter  → OpenRouter free slugs, self-healing across fallback models
+                  when a free slug is retired / 404s
+
+MODEL_NAME is GLOBAL across providers — leave it empty so each provider uses its
+own DEFAULT_MODELS entry (a stray OpenRouter slug will 404 against Gemini).
+
+On boot the app resolves LLM_PROVIDER and calls validate_startup(). If the
+required key is missing it refuses to start and prints the exact free signup URL
+— so you never hit a cryptic mid-request failure.
+
+---
+
+Limits & error handling
+
+  - Word caps: Promote 100–3000 words; Story Map / Imagine up to 3000 (Imagine
+    is lenient on the low end — the whole point is to break a dead end).
+  - Upload cap: MAX_UPLOAD_MB (default 25) → 413 if exceeded; unknown file type
+    → 415.
+  - Optional access code (X-Access-Code header) and per-IP rate limit
+    (RATE_LIMIT, default 20/hr) via app infra.
+  - A model response we can't parse becomes a clean, honest error WITH a body
+    (Story Map /map → 500 unreadable_map) plus a server-side traceback — never a
+    bare 502, never a swallowed exception. The scan loader is best-effort and
+    degrades to no entities rather than blocking the real map.
+
+---
+
+The CLI
+
+Same provider config, same logic, no server needed:
+
+  pip install -e .
+  quiet-shelf format|blurb|promote|storymap|imagine ...
+  quiet-shelf themes     # list EPUB themes
+  quiet-shelf health     # show configured provider + model
+
+Note: storymap/imagine deliberately show a full traceback on engine failure
+(they do not swallow errors, unlike format/blurb), to make failures debuggable.

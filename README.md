@@ -5,11 +5,18 @@ returns finished, sellable, promotable things — your story, on the shelf. It's
 free, open-source, and runs on free-tier or fully-local AI. No accounts, no
 billing, no paid AI keys.
 
-## Three services
+## Four services
 
-- **Format** — turn a manuscript (DOCX/RTF/TXT) into a beautiful, themed EPUB.
+- **Format** — turn a manuscript (DOCX/RTF/TXT) into a beautiful, themed EPUB. No AI at all.
 - **Blurb** — turn a manuscript into back-cover copy, taglines, and store keywords.
 - **Promote** — turn a written piece into a stock-footage shot list for a promo video.
+- **Story Map** — turn a manuscript into a character/relationship map. A *mirror*:
+  it reflects what's on the page and never invents. When there's nothing to
+  reflect, the opt-in **Imagine** door lets you ask it to dream a cast up instead
+  — everything imagined is clearly stamped as invented, never passed off as found.
+
+Each service is fully independent — they share only the provider layer and file
+ingestion, never each other.
 
 ## Run it free (Gemini)
 
@@ -37,9 +44,16 @@ pip install -e .
 quiet-shelf format manuscript.docx --title "My Stories" --author "Name" --theme cozy --out book.epub
 quiet-shelf blurb manuscript.docx --tone warm
 quiet-shelf promote script.txt --out shotlist.json
+quiet-shelf storymap manuscript.docx --out map.json
+quiet-shelf imagine notes.txt --mode seed --nudge "cozy mystery" --out imagined.json
 quiet-shelf themes
 quiet-shelf health
 ```
+
+`storymap` reflects only what's in the text; `imagine` (modes: `seed`, `full`,
+`prompts`) is the opt-in door that invents from any material — add `--reroll`
+for a fresh take. Every CLI command runs in-process with the same provider
+config as the server.
 
 ## A note on EPUBs
 

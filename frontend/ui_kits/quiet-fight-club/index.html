@@ -1,0 +1,242 @@
+<!-- @dsCard group="Quiet Fight Club App" viewport="1100x760" name="Quiet Fight Club" subtitle="Paste a script → mapped shot list. Fully interactive." -->
+<!-- @startingPoint section="Screens" subtitle="The full app — Empty Desk → Working → Shot List" viewport="1100x760" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiet Fight Club</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="./engine.js"></script>
+<style>
+  /* Kit-level layout. Component styles live in the bundle. */
+  .qfc-page {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: var(--space-12) var(--space-5) var(--space-16);
+  }
+  .qfc-page--center {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .qfc-page__header {
+    text-align: center;
+    margin-bottom: var(--space-10);
+  }
+  .qfc-wordmark {
+    font-family: var(--font-display);
+    font-size: var(--fs-display);
+    font-weight: var(--fw-display);
+    line-height: var(--lh-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-body);
+    margin: 0 0 var(--space-3) 0;
+  }
+  .qfc-tagline {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--fs-title);
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .qfc-deskmeta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-3);
+  }
+  .qfc-deskmeta__counts {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+  }
+  .qfc-textlink {
+    background: none;
+    border: none;
+    padding: 4px 2px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color var(--dur-fast) var(--ease-quiet);
+  }
+  .qfc-textlink:hover { color: var(--text-muted); }
+  .qfc-fieldnote {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: var(--fs-body);
+    color: var(--danger-text);
+    margin: var(--space-4) 0 0 0;
+  }
+  .qfc-deskaction {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-8);
+  }
+
+  /* Working */
+  .qfc-working {
+    margin: var(--space-16) auto 0;
+    max-width: 380px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+  .qfc-working__line {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--fs-title);
+    color: var(--text-muted);
+    margin: 0;
+    animation: qfc-fadein var(--dur-slow) var(--ease-quiet) both;
+  }
+  @keyframes qfc-fadein {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Engine error */
+  .qfc-enginerror {
+    margin: var(--space-16) auto 0;
+    max-width: 420px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+  }
+  .qfc-enginerror__msg {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: var(--fs-script);
+    line-height: var(--lh-body);
+    color: var(--text-body);
+    margin: 0;
+  }
+  .qfc-enginerror__actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+  }
+
+  /* Results */
+  .qfc-summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(21, 17, 13, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--edge-soft);
+  }
+  .qfc-summary__inner {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: var(--space-3) var(--space-5);
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    flex-wrap: wrap;
+  }
+  .qfc-summary__facts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .qfc-summary__title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.125rem;
+    color: var(--text-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 230px;
+  }
+  .qfc-summary__meta {
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+  }
+  .qfc-summary__progress { flex: 1; min-width: 170px; }
+  .qfc-summary__actions { display: flex; align-items: center; }
+  .qfc-summary__btns, .qfc-summary__confirm {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .qfc-summary__confirmtext {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+  }
+  .qfc-board {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-5) var(--space-16);
+  }
+  .qfc-board__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .qfc-deal {
+    animation: qfc-deal var(--dur-slow) var(--ease-settle) both;
+  }
+  @keyframes qfc-deal {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .qfc-board__partial {
+    margin-top: var(--space-8);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .qfc-board__partial p {
+    font-family: var(--font-body);
+    font-style: italic;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .qfc-page { padding: var(--space-8) var(--space-4) var(--space-12); }
+    .qfc-summary__inner { gap: var(--space-3); }
+    .qfc-summary__title { max-width: 100%; }
+    .qfc-summary__progress { min-width: 100%; order: 3; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="./screens.jsx"></script>
+<script type="text/babel" src="./shotlist.jsx"></script>
+<script type="text/babel" src="./app.jsx"></script>
+</body>
+</html>

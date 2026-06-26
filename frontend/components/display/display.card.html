@@ -1,0 +1,45 @@
+<!-- @dsCard group="Components" viewport="700x330" name="Display" subtitle="Stamps, search chips, progress bar, icon set" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Stamp, SearchChip, ProgressBar, Icon } = window.QuietFightClubDesignSystem_fae847;
+
+function DisplayCard() {
+  return (
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Stamp>hopeful</Stamp>
+        <Stamp>wistful</Stamp>
+        <Stamp tone="oxblood">tense</Stamp>
+        <Stamp tone="ember">found</Stamp>
+        <Stamp tone="paper">draft</Stamp>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <SearchChip term="rain on window night" best />
+        <SearchChip term="desk lamp writing" />
+        <SearchChip term="empty city street" />
+      </div>
+      <ProgressBar value={0.5} label="7 of 14 segments clipped" />
+      <div style={{ display: 'flex', gap: 14, color: 'var(--text-muted)', alignItems: 'center' }}>
+        {['feather','pen-line','film','clapperboard','search','clock','sparkles','circle-check','copy','rotate-ccw','circle-alert','external-link','list-checks','book-open','file-text','arrow-right'].map(function(n) {
+          return <Icon key={n} name={n} size={16} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<DisplayCard />);
+</script>
+</body>
+</html>

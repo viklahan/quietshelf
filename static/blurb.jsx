@@ -153,19 +153,21 @@ function Blurb() {
           minHeight={220}
           ariaLabel="Your story"
         />
-        <div className="qs-actionrow" style={{ marginTop: 'var(--space-4)' }}>
-          <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={QS_HIDDEN_INPUT} tabIndex={-1} />
-          {file ? (
-            <div className="qs-file qs-drop--filled" style={{ flex: 1 }}>
-              <span className="qs-file__name"><QSIcoBlurb name="file-text" size={18} className="qs-file__ico" />{file.name}</span>
-              <button type="button" className="qs-payoff__again" onClick={clearFile}>Remove</button>
-            </div>
-          ) : (
-            <button type="button" className="qs-payoff__again" onClick={() => fileRef.current && fileRef.current.click()}>
-              <QSIcoBlurb name="file-text" size={13} />Bring the file instead
-            </button>
-          )}
-        </div>
+        <div className="qs-or"><span>or</span></div>
+
+        <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={QS_HIDDEN_INPUT} tabIndex={-1} />
+        {file ? (
+          <div className="qs-file qs-drop--filled">
+            <span className="qs-file__name"><QSIcoBlurb name="file-text" size={18} className="qs-file__ico" />{file.name}</span>
+            <button type="button" className="qs-payoff__again" onClick={clearFile}>Remove</button>
+          </div>
+        ) : (
+          <button type="button" className="qs-drop" onClick={() => fileRef.current && fileRef.current.click()}>
+            <span className="qs-drop__ico"><QSIcoBlurb name="file-text" size={28} /></span>
+            <p className="qs-drop__line">Bring me your story.</p>
+            <p className="qs-drop__hint">Word, RTF, or text</p>
+          </button>
+        )}
         {file ? <p className="qs-quiethint" style={{ marginTop: 'var(--space-3)' }}>Using your file. I’ll read a representative sample of it.</p> : null}
         {error ? <p className="qs-note"><QSIcoBlurb name="circle-alert" size={16} />{error}</p> : null}
       </div>

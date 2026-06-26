@@ -8,7 +8,7 @@ def test_health(client):
     body = response.json()
     assert body["status"] == "ok"
     assert body["provider"] == "gemini"
-    assert set(body["services"]) == {"format", "blurb", "promote"}
+    assert set(body["services"]) == {"format", "blurb", "promote", "storymap"}
 
 
 def test_themes_endpoint_lists_four(client):

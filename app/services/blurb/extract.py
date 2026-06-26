@@ -1,30 +1,14 @@
-"""Read DOCX/RTF/TXT to plain text, and sample long manuscripts to stay within
-token limits. Never logs content."""
+"""Blurb ingestion: shared file reading plus long-manuscript sampling.
+
+The DOCX/RTF/TXT reader now lives in app.ingest so every service shares one
+implementation; this module re-exports it and adds blurb's sampling helper.
+Never logs content.
+"""
 from __future__ import annotations
 
-import io
+from app.ingest import UnsupportedFormat, extract_text
 
-from striprtf.striprtf import rtf_to_text
-
-
-class UnsupportedFormat(Exception):
-    """The uploaded file is not a DOCX, RTF, or TXT."""
-
-
-def extract_text(data: bytes, ext: str) -> str:
-    ext = ext.lower()
-    if ext == ".txt":
-        return data.decode("utf-8", errors="ignore")
-    if ext == ".rtf":
-        return rtf_to_text(data.decode("utf-8", errors="ignore"))
-    if ext == ".docx":
-        from docx import Document
-
-        doc = Document(io.BytesIO(data))
-        return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    raise UnsupportedFormat(
-        f"Unsupported file type '{ext}'. Please upload a DOCX, RTF, or TXT file."
-    )
+__all__ = ["UnsupportedFormat", "extract_text", "sample_text"]
 
 
 def sample_text(text: str, *, opening_words: int = 1200, middle_words: int = 800) -> str:

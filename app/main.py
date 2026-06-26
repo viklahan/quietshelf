@@ -1,4 +1,4 @@
-"""Quiet Shelf: one FastAPI app mounting three independent services, plus a
+"""Quiet Shelf: one FastAPI app mounting four independent services, plus a
 health check and the static frontend."""
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from app.providers import validate_startup
 from app.services.blurb.router import router as blurb_router
 from app.services.format.router import router as format_router
 from app.services.promote.router import router as promote_router
+from app.services.storymap.router import router as storymap_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +26,22 @@ logging.basicConfig(
 logger = logging.getLogger("quietshelf.api")
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+class RevalidateStaticFiles(StaticFiles):
+    """StaticFiles that asks browsers to revalidate every asset.
+
+    The frontend is hand-edited .jsx/.css served by filename (no content
+    hashing), so a browser that heuristically caches an old copy will silently
+    serve stale UI after an update. `no-cache` keeps conditional requests
+    (ETag/Last-Modified) — unchanged files still return a cheap 304 — while
+    guaranteeing edits are picked up immediately.
+    """
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 @asynccontextmanager
@@ -46,6 +63,7 @@ app.add_middleware(
 app.include_router(format_router)
 app.include_router(blurb_router)
 app.include_router(promote_router)
+app.include_router(storymap_router)
 
 
 @app.get("/api/health")
@@ -53,17 +71,17 @@ def health() -> dict:
     return {
         "status": "ok",
         "provider": config.provider_name(),
-        "services": ["format", "blurb", "promote"],
+        "services": ["format", "blurb", "promote", "storymap"],
     }
 
 
 if STATIC_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", RevalidateStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/", include_in_schema=False, response_model=None)
 def index() -> FileResponse | JSONResponse:
     index_file = STATIC_DIR / "index.html"
     if index_file.is_file():
-        return FileResponse(index_file)
+        return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
     return JSONResponse({"status": "ok", "message": "Quiet Shelf API. See /api/health"})

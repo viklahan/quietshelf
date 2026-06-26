@@ -1,0 +1,129 @@
+{
+  "story_detected": true,
+  "confidence": "high",
+  "note": "",
+  "characters": [
+    {
+      "id": "c1",
+      "name": "Mara",
+      "role": "protagonist",
+      "importance": 5,
+      "personality": "Returning home after seven years, Mara is conflicted but ultimately demonstrates a sense of responsibility and love for her family. She is introspective and struggles with past resentments but also exhibits quiet strength.",
+      "arc": "Mara initially returns with rehearsed coldness towards her father, but by the end, she commits to staying, indicating a significant internal shift from detachment to acceptance and responsibility.",
+      "texture": {
+        "appearance": "has her mother's chin",
+        "clothing": "her father's old grey coat, one with a torn pocket",
+        "habits": "",
+        "routines": "",
+        "notable_objects": "",
+        "associated_places": "the pier, her father's house"
+      },
+      "relationships": [
+        {
+          "with": "c2",
+          "type": "sibling",
+          "note": "They have a long-standing, often conflicted relationship marked by silent understanding and fierce arguments, but also underlying care."
+        },
+        {
+          "with": "c3",
+          "type": "family",
+          "note": "Her dying father, Tom, waited for her return; she struggles with past feelings towards him but ultimately cares for him."
+        },
+        {
+          "with": "c4",
+          "type": "other",
+          "note": "Neighbour who offers support and observations about Mara and her family."
+        }
+      ]
+    },
+    {
+      "id": "c2",
+      "name": "Jack",
+      "role": "supporting",
+      "importance": 4,
+      "personality": "Jack is stoic, outwardly gruff, and carries the burden of staying while Mara left. He expresses anger but also shows a deep, if conflicted, kindness and loyalty to his family.",
+      "arc": "No clear arc within this excerpt; he remains consistent in his conflicted but loyal demeanor.",
+      "texture": {
+        "appearance": "taller than she remembered",
+        "clothing": "",
+        "habits": "smokes cigarettes, walks ahead of Mara",
+        "routines": "",
+        "notable_objects": "cigarette",
+        "associated_places": "harbourmaster's hut, their father's house"
+      },
+      "relationships": [
+        {
+          "with": "c1",
+          "type": "sibling",
+          "note": "He resents Mara for leaving but also cares for her, as shown by giving her tea despite their argument."
+        },
+        {
+          "with": "c3",
+          "type": "family",
+          "note": "He has been caring for his dying father, bearing the financial and emotional burden."
+        }
+      ]
+    },
+    {
+      "id": "c3",
+      "name": "Tom Ferris",
+      "role": "supporting",
+      "importance": 3,
+      "personality": "Previously a steady and selfless man in the village, Tom is now frail and dying, but still holds onto hope for his daughter's return and expresses clear affection for her.",
+      "arc": "He is physically declining but experiences a moment of joy and relief at Mara's return, fulfilling his wish.",
+      "texture": {
+        "appearance": "big hands gone soft and useless, ruined face",
+        "clothing": "under three blankets",
+        "habits": "",
+        "routines": "",
+        "notable_objects": "quilt",
+        "associated_places": "back bedroom of his house"
+      },
+      "relationships": [
+        {
+          "with": "c1",
+          "type": "family",
+          "note": "Mara's father, who waited for her return and is deeply fond of her."
+        },
+        {
+          "with": "c2",
+          "type": "family",
+          "note": "Jack's father, who Jack has been caring for in his illness."
+        },
+        {
+          "with": "c4",
+          "type": "other",
+          "note": "Neighbour, Bess, has been looking in on him daily."
+        }
+      ]
+    },
+    {
+      "id": "c4",
+      "name": "Old Bess",
+      "role": "supporting",
+      "importance": 2,
+      "personality": "A practical, observant, and subtly kind neighbour who doesn't mince words but shows genuine concern for the family.",
+      "arc": "No arc within this excerpt; she serves as a stable, helpful presence.",
+      "texture": {
+        "appearance": "sharp little eyes",
+        "clothing": "",
+        "habits": "lets herself in without knocking, brings food",
+        "routines": "looks in on Tom every day",
+        "notable_objects": "covered dish of soup",
+        "associated_places": "the family kitchen"
+      },
+      "relationships": [
+        {
+          "with": "c1",
+          "type": "other",
+          "note": "Neighbour who offers a frank assessment of Mara and her mother, and encouragement for Mara to stay."
+        },
+        {
+          "with": "c3",
+          "type": "other",
+          "note": "Neighbour who has been caring for the ailing father daily."
+        }
+      ]
+    }
+  ]
+}
