@@ -129,10 +129,16 @@ def map_story(text: str) -> StoryMap:
     return story
 
 
-def _normalize(story: StoryMap) -> StoryMap:
+def _normalize(story: StoryMap, extra_names: list[str] | None = None) -> StoryMap:
     """Clamp importance into 1-5, backfill missing/duplicate ids, drop nameless
     characters, and enforce the core rule: no usable characters means no story,
-    regardless of what the model claimed. Never fabricates."""
+    regardless of what the model claimed. Never fabricates.
+
+    Relationships are pointer-checked: a "with" that names another kept id (or
+    their name, which we resolve to the id) stays; one that names a character in
+    extra_names (an existing cast the imagine engine was building around) is
+    kept as that name; a pointer to nobody is model noise and is dropped -
+    a relationship "with no one on the map" is not a finding."""
     seen_ids: set[str] = set()
     kept = []
     for i, ch in enumerate(story.characters, start=1):
@@ -146,6 +152,29 @@ def _normalize(story: StoryMap) -> StoryMap:
         ch.importance = max(1, min(5, ch.importance))
         kept.append(ch)
     story.characters = kept
+
+    by_name = {ch.name.strip().lower(): ch.id for ch in kept}
+    extras = {n.strip().lower(): n.strip() for n in (extra_names or []) if n.strip()}
+    for ch in kept:
+        resolved = []
+        for rel in ch.relationships:
+            target = (rel.with_ or "").strip()
+            if not target:
+                continue
+            if target in seen_ids:
+                if target != ch.id:  # self-references are noise
+                    resolved.append(rel)
+                continue
+            target_l = target.lower()
+            if target_l in by_name:
+                if by_name[target_l] != ch.id:
+                    rel.with_ = by_name[target_l]
+                    resolved.append(rel)
+                continue
+            if target_l in extras:
+                rel.with_ = extras[target_l]  # a real name; the UI shows it as-is
+                resolved.append(rel)
+        ch.relationships = resolved
 
     if not kept:
         # Zero usable characters: honest empty result, never an invented map.
@@ -288,7 +317,7 @@ def imagine_map(
     cleaned = sanitize(text)
     user = _imagine_user_content(cleaned, nudge, existing, reroll=reroll)
     story = generate_json(system, user, StoryMap)
-    story = _normalize(story)
+    story = _normalize(story, extra_names=existing)
     story.fabricated = True  # never trust the model for the flag - force it
     if story.characters:
         story.story_detected = True

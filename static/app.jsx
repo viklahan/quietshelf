@@ -6,6 +6,7 @@ const QS_TABS = [
   { id: 'format', label: 'Format', icon: 'book-open' },
   { id: 'blurb', label: 'Blurb', icon: 'feather' },
   { id: 'promote', label: 'Promote', icon: 'film' },
+  { id: 'storymap', label: 'Story Map', icon: 'search' },
 ];
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
   else if (tab === 'format') view = <window.Format />;
   else if (tab === 'blurb') view = <window.Blurb />;
   else if (tab === 'promote') view = <window.Promote />;
+  else if (tab === 'storymap') view = <window.StoryMapPage />;
 
   return (
     <div className="qs-app">

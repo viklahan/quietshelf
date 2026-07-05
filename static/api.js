@@ -80,6 +80,46 @@
     return await resp.json();
   }
 
+  // Build the multipart body Story Map endpoints share (pasted text or file).
+  function storyForm({ text, file }) {
+    const fd = new FormData();
+    if (file) fd.append('file', file);
+    else fd.append('text', text || '');
+    return fd;
+  }
+
+  // POST /api/storymap/scan -> { characters[], places[] } — Pass 1, best-effort
+  // names for the live loader. A failure here must never block the real map.
+  async function storymapScan({ text, file }) {
+    const resp = await fetch(BASE + '/api/storymap/scan', { method: 'POST', body: storyForm({ text, file }) });
+    if (!resp.ok) return { characters: [], places: [] };
+    return await resp.json();
+  }
+
+  // POST /api/storymap/map -> StoryMap (the mirror; fabricated is always false)
+  async function storymapMap({ text, file }) {
+    const resp = await fetch(BASE + '/api/storymap/map', { method: 'POST', body: storyForm({ text, file }) });
+    if (!resp.ok) {
+      throw await friendlyError(resp, 'Couldn’t read the story map. Try again in a moment.');
+    }
+    return await resp.json();
+  }
+
+  // POST /api/storymap/imagine -> StoryMap (seed|full) or StoryPrompts (prompts).
+  // The opt-in door: results are always stamped fabricated=true by the engine.
+  async function storymapImagine({ text, file, mode, nudge, existing, reroll }) {
+    const fd = storyForm({ text, file });
+    fd.append('mode', mode || 'seed');
+    if (nudge) fd.append('nudge', nudge);
+    if (existing && existing.length) fd.append('existing', existing.join(','));
+    if (reroll) fd.append('reroll', 'true');
+    const resp = await fetch(BASE + '/api/storymap/imagine', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      throw await friendlyError(resp, 'Couldn’t imagine a story this time. Try again in a moment.');
+    }
+    return await resp.json();
+  }
+
   // GET /api/health -> { status, provider, services[] }
   async function health() {
     const resp = await fetch(BASE + '/api/health');
@@ -93,5 +133,9 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  window.QS_API = { fetchThemes, formatBook, generateBlurb, promote, health, calmDelay };
+  window.QS_API = {
+    fetchThemes, formatBook, generateBlurb, promote,
+    storymapScan, storymapMap, storymapImagine,
+    health, calmDelay,
+  };
 })();

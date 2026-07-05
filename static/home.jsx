@@ -45,6 +45,12 @@ function Home({ onNavigate }) {
           line="Turn your writing into a video plan."
           onOpen={() => onNavigate('promote')}
         />
+        <Door
+          icon="search"
+          title="Story Map"
+          line="See who’s in your story, and how they connect."
+          onOpen={() => onNavigate('storymap')}
+        />
       </div>
 
       <div className="qs-shelfwrap">

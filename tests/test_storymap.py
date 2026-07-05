@@ -130,6 +130,65 @@ def test_map_story_drops_nameless_characters(monkeypatch):
     assert [c.name for c in result.characters] == ["Real Person"]
 
 
+def test_map_story_drops_dangling_relationships_and_resolves_names(monkeypatch):
+    """Pointer check: a "with" naming another kept character (by id OR name)
+    stays; a pointer to nobody on the map, or to the character itself, is model
+    noise and is dropped — never shown to the writer as a raw id."""
+    from app.services.storymap.engine import map_story
+    from app.services.storymap.models import Relationship
+
+    raw = StoryMap(
+        story_detected=True,
+        confidence="high",
+        characters=[
+            Character(
+                id="c1", name="Mara",
+                relationships=[
+                    Relationship(**{"with": "c2", "type": "sibling"}),   # valid id
+                    Relationship(**{"with": "Jack", "type": "family"}),  # name -> id
+                    Relationship(**{"with": "c9", "type": "other"}),     # dangling
+                    Relationship(**{"with": "c1", "type": "self"}),      # self-ref
+                    Relationship(**{"with": "  ", "type": "other"}),     # blank
+                ],
+            ),
+            Character(id="c2", name="Jack"),
+        ],
+    )
+    _patch_map(monkeypatch, raw)
+    result = map_story("a story with enough words present to map two characters")
+
+    rels = result.characters[0].relationships
+    assert [r.with_ for r in rels] == ["c2", "c2"]
+
+
+def test_imagine_map_keeps_relationships_to_existing_cast(monkeypatch):
+    """The imagine engine building around an existing cast may point at those
+    characters by name; the pointer survives as the name. Pointers to nobody
+    (an id the model dreamed up) still drop."""
+    from app.services.storymap import engine
+    from app.services.storymap.models import ImagineMode, Relationship
+
+    raw = StoryMap(
+        characters=[
+            Character(
+                id="c1", name="Elara",
+                relationships=[
+                    Relationship(**{"with": "mara", "type": "confidant"}),  # existing, case-insensitive
+                    Relationship(**{"with": "c3", "type": "other"}),        # dangling
+                ],
+            ),
+        ],
+    )
+    monkeypatch.setattr(engine, "generate_json", lambda system, user, model: raw)
+    result = engine.imagine_map(
+        "a few lines of material", ImagineMode.seed, existing=["Mara", "Jack"]
+    )
+
+    assert result.fabricated is True
+    rels = result.characters[0].relationships
+    assert [r.with_ for r in rels] == ["Mara"]
+
+
 def test_map_story_forces_no_story_when_no_usable_characters(monkeypatch):
     """Anti-fabrication: a model claiming a story but giving no real characters
     is overruled - we never surface an invented map."""
