@@ -7,14 +7,21 @@
   // Turn a non-2xx response into a calm, writer-friendly Error.
   async function friendlyError(resp, fallback) {
     let msg = fallback;
+    let data = null;
     try {
-      const data = await resp.json();
+      data = await resp.json();
       msg = data.message || data.detail || fallback;
     } catch (e) {
       /* non-JSON body — keep the fallback */
     }
     if (resp.status === 429) {
-      msg = 'The free AI tier needs a breather. Try again in a little while.';
+      // Two different 429s share this status: the upstream free AI tier
+      // (body has error:"rate_limited") and this app's OWN per-IP hourly cap.
+      // Blaming the AI tier for our own cap sends self-hosters chasing the
+      // wrong knob - name the right one.
+      msg = (data && data.error === 'rate_limited')
+        ? 'The free AI tier needs a breather. Try again in a little while.'
+        : 'You’ve reached this app’s own hourly request cap. If you’re self-hosting, raise RATE_LIMIT in your .env and restart.';
     }
     const err = new Error(msg);
     err.status = resp.status;

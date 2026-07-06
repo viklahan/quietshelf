@@ -75,6 +75,57 @@ def test_endpoint_429_on_rate_limit(client, valid_script, monkeypatch):
     assert response.json()["error"] == "rate_limited"
 
 
+def _valid_chunk_result():
+    from app.services.promote.models import ChunkResult, ChunkSegment
+
+    return ChunkResult(
+        video_title_suggestion="A Test Title",
+        segments=[
+            ChunkSegment(
+                script_text="the quick brown fox jumps over the lazy dog.",
+                search_terms=["fox running field", "dog sleeping grass", "forest light"],
+                clip_duration_seconds=5,
+                mood="calm",
+            )
+        ],
+    )
+
+
+def test_transient_upstream_error_retried_once(client, valid_script, monkeypatch):
+    """One flaky 5xx among many chunks must not tank the whole map - the
+    chunk gets exactly one retry. A second consecutive failure still
+    propagates honestly as 502."""
+    from app.providers import ProviderError
+    from app.services.promote import mapper
+
+    calls = {"n": 0}
+
+    def flaky_then_fine(system, user, model):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ProviderError("upstream 500")
+        return _valid_chunk_result()
+
+    monkeypatch.setattr(mapper, "generate_json", flaky_then_fine)
+    monkeypatch.setattr(mapper.time, "sleep", lambda _s: None)
+    response = client.post("/api/promote", json={"script": valid_script})
+    assert response.status_code == 200
+    assert response.json()["segments"]
+
+
+def test_persistent_upstream_error_is_502(client, valid_script, monkeypatch):
+    from app.providers import ProviderError
+    from app.services.promote import mapper
+
+    def always_down(system, user, model):
+        raise ProviderError("upstream 500")
+
+    monkeypatch.setattr(mapper, "generate_json", always_down)
+    monkeypatch.setattr(mapper.time, "sleep", lambda _s: None)
+    response = client.post("/api/promote", json={"script": valid_script})
+    assert response.status_code == 502
+
+
 def test_empty_script_rejected(client):
     response = client.post("/api/promote", json={"script": ""})
     assert response.status_code == 422

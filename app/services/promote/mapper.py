@@ -19,7 +19,12 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from app.providers import JSONParseError, ProviderRateLimited, generate_json
+from app.providers import (
+    JSONParseError,
+    ProviderError,
+    ProviderRateLimited,
+    generate_json,
+)
 from app.services.promote.models import ChunkResult, ChunkSegment, Segment, ShotList
 
 logger = logging.getLogger("quietshelf.promote")
@@ -106,22 +111,35 @@ def _keywords(text: str, count: int = 6) -> list[str]:
 
 
 def _map_chunk(chunk: str) -> ChunkResult:
-    """Map one excerpt, retrying if the upstream still rate-limits us.
+    """Map one excerpt, retrying the two transient upstream failures.
 
-    The provider layer paces requests client-side, so a 429 here means the
-    key's quota window is polluted by something outside this process. Quotas
-    are per rolling MINUTE - a retry must wait long enough to reach a fresh
-    window, or it just burns into the same dead one."""
-    delay = 20.0
-    for attempt in range(RATE_LIMIT_RETRIES + 1):
+    Rate limits: the provider layer paces requests client-side, so a 429 here
+    means the key's quota window is polluted by something outside this
+    process. Quotas are per rolling MINUTE - a retry must wait long enough to
+    reach a fresh window, or it just burns into the same dead one.
+
+    Upstream 5xx: with 15 chunks per script, one flaky model response per run
+    is the NORM, not the exception - and without a retry that single chunk
+    tanks the entire map into a 502. One quick retry; if it fails again the
+    error propagates honestly."""
+    rate_delay = 20.0
+    rate_retries = 0
+    upstream_retries = 0
+    while True:
         try:
             return generate_json(SYSTEM_PROMPT, chunk, ChunkResult)
         except ProviderRateLimited:
-            if attempt == RATE_LIMIT_RETRIES:
+            if rate_retries >= RATE_LIMIT_RETRIES:
                 raise
-            time.sleep(delay)
-            delay *= 1.5
-    raise AssertionError("unreachable")
+            rate_retries += 1
+            time.sleep(rate_delay)
+            rate_delay *= 1.5
+        except ProviderError:  # after ProviderRateLimited - it subclasses this
+            if upstream_retries >= 1:
+                raise
+            upstream_retries += 1
+            logger.warning("chunk_upstream_error -> one retry")
+            time.sleep(2.0)
 
 
 def _try_map_chunk(chunk: str) -> ChunkResult | None:
