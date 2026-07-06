@@ -14,6 +14,7 @@ from app.providers.base import (
     ProviderRateLimited,
     ProviderTimeout,
 )
+from app.providers.pacing import acquire_slot
 
 logger = logging.getLogger("quietshelf.openrouter")
 
@@ -63,6 +64,7 @@ class OpenRouterProvider(Provider):
     def generate(
         self, system_prompt: str, user_content: str, json_mode: bool = True
     ) -> str:
+        acquire_slot(self.name)
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=config.openrouter_api_key(),

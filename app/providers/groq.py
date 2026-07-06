@@ -11,6 +11,7 @@ from app.providers.base import (
     ProviderRateLimited,
     ProviderTimeout,
 )
+from app.providers.pacing import acquire_slot
 
 
 class GroqProvider(Provider):
@@ -27,6 +28,7 @@ class GroqProvider(Provider):
     def generate(
         self, system_prompt: str, user_content: str, json_mode: bool = True
     ) -> str:
+        acquire_slot(self.name)
         client = groq_sdk.Groq(
             api_key=config.groq_api_key(),
             timeout=config.LLM_TIMEOUT_SECONDS,

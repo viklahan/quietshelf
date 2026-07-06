@@ -106,8 +106,13 @@ def _keywords(text: str, count: int = 6) -> list[str]:
 
 
 def _map_chunk(chunk: str) -> ChunkResult:
-    """Map one excerpt, retrying briefly if a parallel burst gets rate-limited."""
-    delay = 3.0
+    """Map one excerpt, retrying if the upstream still rate-limits us.
+
+    The provider layer paces requests client-side, so a 429 here means the
+    key's quota window is polluted by something outside this process. Quotas
+    are per rolling MINUTE - a retry must wait long enough to reach a fresh
+    window, or it just burns into the same dead one."""
+    delay = 20.0
     for attempt in range(RATE_LIMIT_RETRIES + 1):
         try:
             return generate_json(SYSTEM_PROMPT, chunk, ChunkResult)

@@ -9,6 +9,7 @@ import pytest
 os.environ["LLM_PROVIDER"] = "gemini"
 os.environ["GEMINI_API_KEY"] = "test-key-not-real"
 os.environ.setdefault("RATE_LIMIT", "1000")  # don't trip the limiter in tests
+os.environ.setdefault("GEMINI_RPM", "0")  # no client-side pacing in tests
 os.environ.pop("ACCESS_CODE", None)
 os.environ.pop("MODEL_NAME", None)
 

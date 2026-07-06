@@ -14,6 +14,7 @@ from app.providers.base import (
     ProviderRateLimited,
     ProviderTimeout,
 )
+from app.providers.pacing import acquire_slot
 
 
 class GeminiProvider(Provider):
@@ -30,6 +31,7 @@ class GeminiProvider(Provider):
     def generate(
         self, system_prompt: str, user_content: str, json_mode: bool = True
     ) -> str:
+        acquire_slot(self.name)
         client = genai.Client(
             api_key=config.gemini_api_key(),
             http_options=genai_types.HttpOptions(

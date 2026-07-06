@@ -24,6 +24,10 @@ DEFAULT_OPENROUTER_FALLBACKS = [
     "google/gemma-4-31b-it:free",
 ]
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+# Client-side pacing: max upstream requests per rolling minute, per provider.
+# Gemini's free tier allows ~10 RPM; 8 leaves headroom for anything else the
+# key is doing. 0 = unpaced. Ollama is local - never paced by default.
+DEFAULT_PROVIDER_RPM = {"gemini": 8}
 DEFAULT_RATE_LIMIT = 20  # requests per hour per IP
 DEFAULT_MAX_UPLOAD_MB = 25
 LLM_TIMEOUT_SECONDS = 120.0
@@ -40,6 +44,18 @@ def provider_name() -> str:
 def model_name() -> str:
     override = os.getenv("MODEL_NAME", "").strip()
     return override or DEFAULT_MODELS.get(provider_name(), "")
+
+
+def provider_rpm(provider: str) -> int:
+    """Client-side requests-per-minute cap for a provider. Override with
+    <PROVIDER>_RPM (e.g. GEMINI_RPM=5); 0 disables pacing."""
+    raw = os.getenv(f"{provider.upper()}_RPM", "").strip()
+    if raw:
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            pass
+    return DEFAULT_PROVIDER_RPM.get(provider, 0)
 
 
 def openrouter_fallback_models() -> list[str]:
