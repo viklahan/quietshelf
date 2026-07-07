@@ -118,14 +118,15 @@ def test_promote_endpoint_grounds_with_map(client, monkeypatch, valid_script, va
 
     captured = {}
 
-    def fake_map_script(script, cast_context=""):
-        captured["cast_context"] = cast_context
+    def fake_map_script(script, story_map=None):
+        captured["story_map"] = story_map
         return ShotList(**valid_shot_list)
 
     monkeypatch.setattr(promote_router_mod, "map_script", fake_map_script)
     resp = client.post("/api/promote", json={"script": valid_script, "story_map": SAMPLE_MAP})
     assert resp.status_code == 200
-    assert "Mara" in captured["cast_context"]
+    assert captured["story_map"] is not None
+    assert captured["story_map"].characters[0].name == "Mara"
 
 
 def test_promote_endpoint_rejects_unreadable_map(client, valid_script):
@@ -143,14 +144,14 @@ def test_promote_endpoint_without_map_stays_ungrounded(client, monkeypatch, vali
 
     captured = {}
 
-    def fake_map_script(script, cast_context=""):
-        captured["cast_context"] = cast_context
+    def fake_map_script(script, story_map=None):
+        captured["story_map"] = story_map
         return ShotList(**valid_shot_list)
 
     monkeypatch.setattr(promote_router_mod, "map_script", fake_map_script)
     resp = client.post("/api/promote", json={"script": valid_script})
     assert resp.status_code == 200
-    assert captured["cast_context"] == ""
+    assert captured["story_map"] is None
 
 
 # --- the sheet reaches every chunk's prompt -----------------------------------
@@ -158,6 +159,7 @@ def test_promote_endpoint_without_map_stays_ungrounded(client, monkeypatch, vali
 def test_map_script_puts_cast_sheet_in_every_chunk_system_prompt(monkeypatch, valid_script):
     from app.services.promote import mapper
     from app.services.promote.models import ChunkResult, ChunkSegment
+    from app.services.storymap.grounding import parse_map
 
     systems = []
 
@@ -172,13 +174,63 @@ def test_map_script_puts_cast_sheet_in_every_chunk_system_prompt(monkeypatch, va
         )
 
     monkeypatch.setattr(mapper, "generate_json", fake_generate_json)
-    from app.services.storymap.grounding import cast_sheet, parse_map
-    sheet = cast_sheet(parse_map(SAMPLE_MAP))
-    result = mapper.map_script(valid_script, cast_context=sheet)
+    result = mapper.map_script(valid_script, story_map=parse_map(SAMPLE_MAP))
     assert result.segments
     assert systems and all("Mara" in s for s in systems)
 
-    # And without a sheet, the addendum never leaks into the prompt.
+    # And without a map, the addendum never leaks into the prompt.
     systems.clear()
     mapper.map_script(valid_script)
     assert systems and all("cast sheet" not in s for s in systems)
+
+
+# --- anchor terms + per-segment cast (clip consistency) -----------------------
+
+def test_grounded_segments_get_anchor_term_and_cast(monkeypatch):
+    """Every segment that names a mapped character gets that character's
+    deterministic anchor prepended and the name in cast - and segments that
+    name nobody get neither."""
+    from app.services.promote import mapper
+    from app.services.promote.models import ChunkResult, ChunkSegment
+    from app.services.storymap.grounding import parse_map
+
+    script = (
+        "Mara walked to the harbor in the cold morning light and waited. "
+        "The town slept late and nothing moved on the long grey water. "
+    ) * 10
+
+    def fake_generate_json(system, user, model):
+        return ChunkResult(
+            video_title_suggestion="t",
+            segments=[
+                ChunkSegment(script_text="Mara walked to the harbor.",
+                             search_terms=["woman walking", "harbor morning", "cold light"],
+                             clip_duration_seconds=5, mood="calm"),
+                ChunkSegment(script_text="The town slept late.",
+                             search_terms=["small town", "empty street", "morning fog"],
+                             clip_duration_seconds=5, mood="calm"),
+            ],
+        )
+
+    monkeypatch.setattr(mapper, "generate_json", fake_generate_json)
+    result = mapper.map_script(script, story_map=parse_map(SAMPLE_MAP))
+
+    mara_segments = [s for s in result.segments if "Mara" in s.script_text]
+    other_segments = [s for s in result.segments if "Mara" not in s.script_text]
+    assert mara_segments and other_segments
+
+    anchor = "red coat the harbor"  # appearance + places, deterministic
+    for seg in mara_segments:
+        assert seg.search_terms[0] == anchor   # same anchor, ranked first, every time
+        assert seg.cast == ["Mara"]
+        assert len(seg.search_terms) <= 8
+    for seg in other_segments:
+        assert anchor not in seg.search_terms
+        assert seg.cast == []
+
+
+def test_anchor_term_is_empty_without_texture():
+    """No texture, no anchor - nothing is ever inferred from a bare name."""
+    from app.services.promote.mapper import _anchor_term
+    from app.services.storymap.models import Character
+    assert _anchor_term(Character(id="enn", name="Enn")) == ""

@@ -26,6 +26,8 @@ from app.providers import (
     generate_json,
 )
 from app.services.promote.models import ChunkResult, ChunkSegment, Segment, ShotList
+from app.services.storymap.grounding import cast_sheet
+from app.services.storymap.models import Character, StoryMap
 
 logger = logging.getLogger("quietshelf.promote")
 
@@ -168,6 +170,39 @@ def _try_map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult | Non
         return None
 
 
+def _anchor_term(ch: Character) -> str:
+    """One canonical, deterministic search string per character, from the
+    concrete texture the writer's map actually contains (appearance + places -
+    the visual signature). Nothing is inferred; no texture, no anchor. The same
+    anchor lands on the same stock-search results page for every segment the
+    character appears in - that consistency is the whole point."""
+    words: list[str] = []
+    for attr in ("appearance", "associated_places"):
+        value = getattr(ch.texture, attr, None)
+        if value:
+            words.extend(w.strip(",.;:!?") for w in value.lower().split())
+    unique = list(dict.fromkeys(w for w in words if w))
+    return " ".join(unique[:5])
+
+
+def _mentions(text: str, name: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(name)}\b", text, re.IGNORECASE))
+
+
+def _ground_segment(text: str, terms: list[str], cast: list[Character]) -> tuple[list[str], list[str]]:
+    """Anchor a segment to the characters actually named in its text.
+    Returns (search_terms with anchors prepended, names present)."""
+    present = [ch for ch in cast if _mentions(text, ch.name)]
+    grounded = list(terms)
+    # Prepend in reverse so the first-listed (most important) character's
+    # anchor ends up ranked first.
+    for ch in reversed(present):
+        anchor = _anchor_term(ch)
+        if anchor and all(anchor != t.lower().strip() for t in grounded):
+            grounded.insert(0, anchor)
+    return grounded[:8], [ch.name for ch in present]
+
+
 def _fallback_chunk(chunk: str) -> ChunkResult:
     """Local, never-fails coarse mapping (~2 sentences per segment) so a chunk
     the model couldn't handle still gets full coverage with editable keywords."""
@@ -189,10 +224,12 @@ def _fallback_chunk(chunk: str) -> ChunkResult:
     return ChunkResult(video_title_suggestion="", segments=segments)
 
 
-def map_script(script: str, cast_context: str = "") -> ShotList:
+def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
     """Map a full script to a validated shot list via parallel chunk mapping.
-    cast_context, when present, is the writer's Story Map cast sheet - every
-    chunk sees it so search terms stay consistent across the whole piece."""
+    story_map, when present, grounds the run twice over: every chunk sees the
+    cast sheet in its prompt, and each stitched segment gets the deterministic
+    anchor term + cast names for the characters actually mentioned in it."""
+    cast_context = cast_sheet(story_map) if story_map else ""
     system = SYSTEM_PROMPT + (CAST_ADDENDUM.format(cast=cast_context) if cast_context else "")
     chunks = _chunk_script(script, CHUNK_TARGET_WORDS)
     logger.info("promote_map chunks=%d grounded=%s", len(chunks), bool(cast_context))
@@ -220,15 +257,21 @@ def map_script(script: str, cast_context: str = "") -> ShotList:
             title = result.video_title_suggestion.strip()
         for draft in result.segments:
             duration = max(1, int(draft.clip_duration_seconds))
+            terms, cast = (
+                _ground_segment(draft.script_text, draft.search_terms, story_map.characters)
+                if story_map
+                else (draft.search_terms, [])
+            )
             segments.append(
                 Segment(
                     id=len(segments) + 1,
                     script_text=draft.script_text,
                     start_time=_mmss(cumulative),
                     end_time=_mmss(cumulative + duration),
-                    search_terms=draft.search_terms,
+                    search_terms=terms,
                     clip_duration_seconds=duration,
                     mood=draft.mood,
+                    cast=cast,
                 )
             )
             cumulative += duration

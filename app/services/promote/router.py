@@ -12,7 +12,7 @@ from app.http_errors import llm_error_to_response
 from app.providers import JSONParseError, ProviderConfigError, ProviderError
 from app.services.promote.mapper import map_script
 from app.services.promote.models import PromoteRequest, ShotList
-from app.services.storymap.grounding import MapParseError, cast_sheet, parse_map
+from app.services.storymap.grounding import MapParseError, parse_map
 
 logger = logging.getLogger("quietshelf.promote")
 
@@ -34,19 +34,19 @@ def promote(body: PromoteRequest, request: Request, _: None = Depends(guard)):
 
     # Optional Story Map grounding. A bad attachment is a clear 422, never a
     # silent un-grounded run the writer believes was grounded.
-    cast_context = ""
+    story_map = None
     if body.story_map is not None:
         try:
-            cast_context = cast_sheet(parse_map(body.story_map))
+            story_map = parse_map(body.story_map)
         except MapParseError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
     logger.info(
         "promote_request word_count=%d provider=%s grounded=%s",
-        word_count, config.provider_name(), bool(cast_context),
+        word_count, config.provider_name(), story_map is not None,
     )
     try:
-        return map_script(body.script, cast_context=cast_context)
+        return map_script(body.script, story_map=story_map)
     except (JSONParseError, ProviderConfigError, ProviderError) as exc:
         return llm_error_to_response(
             exc,

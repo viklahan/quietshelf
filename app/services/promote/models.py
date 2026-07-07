@@ -20,6 +20,10 @@ class Segment(BaseModel):
     search_terms: list[str] = Field(..., min_length=3, max_length=8)
     clip_duration_seconds: int
     mood: str
+    # Grounded runs only: names from the writer's story map that appear in this
+    # segment's text (deterministic word match, never inferred). Lets the UI
+    # key found-clip memory to the character, not the segment.
+    cast: list[str] = Field(default_factory=list)
 
 
 class ShotList(BaseModel):

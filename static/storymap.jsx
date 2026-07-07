@@ -259,9 +259,15 @@ function StoryMapPage() {
   }
 
   /* Save the map as a file the writer owns — re-loadable here, and the
-     grounding source for Blurb and Promote. */
+     grounding source for Blurb and Promote. Found-clip castings ride along
+     so footage choices survive across sessions and machines. */
   function downloadMap(m) {
-    const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
+    let out = m;
+    try {
+      const castings = JSON.parse(localStorage.getItem('qs.promote.castings'));
+      if (castings && Object.keys(castings).length) out = { ...m, castings };
+    } catch (e) { /* no castings to carry */ }
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `story-map-${new Date().toISOString().slice(0, 10)}.json`;
@@ -287,6 +293,9 @@ function StoryMapPage() {
         setMap(m);
         if (!m.fabricated && m.story_detected) setFoundMap(m);
         saveLastMap(m);
+        if (m.castings && typeof m.castings === 'object' && !Array.isArray(m.castings)) {
+          try { localStorage.setItem('qs.promote.castings', JSON.stringify(m.castings)); } catch (err) {}
+        }
         setPhase('map');
       } catch (err) {
         setError('That file doesn’t look like a saved story map. Save one from this tab first.');

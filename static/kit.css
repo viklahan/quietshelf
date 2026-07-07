@@ -477,6 +477,14 @@
 .qs-meter strong { color: var(--text-muted); font-weight: 500; }
 /* the story-map grounding row shared by Blurb and Promote */
 .qs-groundrow { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
+/* found-clip memory under a grounded segment card */
+.qs-casting { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-2) 0 0 var(--space-4); }
+.qs-casting__link {
+  font-family: var(--font-mono); font-size: var(--fs-meta); letter-spacing: var(--ls-meta);
+  color: var(--text-muted); text-decoration: none;
+}
+.qs-casting__link:hover { color: var(--ember-400); }
+.qs-casting__input { font-size: var(--fs-meta); }
 .qs-mapline {
   display: flex; align-items: center; gap: var(--space-3);
   font-family: var(--font-body); font-style: italic; color: var(--text-muted);

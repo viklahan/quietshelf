@@ -37,7 +37,20 @@ function toCard(seg) {
     moodTone: moodToTone(seg.mood),
     clipDurationSeconds: seg.clip_duration_seconds,
     terms: seg.search_terms || [],
+    cast: seg.cast || [],
   };
+}
+
+/* Found-clip memory — clip links keyed to the CHARACTER, not the segment,
+   so the same person keeps the same footage across the whole video (and
+   across sessions: castings travel inside the saved story map file). */
+const QS_CASTINGS_KEY = 'qs.promote.castings';
+
+function loadCastings() {
+  try { return JSON.parse(localStorage.getItem(QS_CASTINGS_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveCastings(c) {
+  try { localStorage.setItem(QS_CASTINGS_KEY, JSON.stringify(c)); } catch (e) {}
 }
 
 function Promote() {
@@ -56,8 +69,20 @@ function Promote() {
     return !!(m && !m.fabricated);
   });
   const [groundedBy, setGroundedBy] = React.useState(null); // {n, fabricated} of the run shown
+  const [castings, setCastings] = React.useState(loadCastings);
 
   const words = countWords(text);
+
+  /* Keep (or clear) the clip link for every character in a segment. */
+  function keepClip(names, url) {
+    const next = { ...castings };
+    names.forEach((n) => {
+      if (url) next[n] = { url };
+      else delete next[n];
+    });
+    setCastings(next);
+    saveCastings(next);
+  }
 
   async function map() {
     if (words < QS_MIN_WORDS) {
@@ -161,6 +186,24 @@ function Promote() {
                 found={!!found[s.index]}
                 onFoundChange={(v) => toggle(s.index, v)}
               />
+              {s.cast.length ? (
+                <div className="qs-casting">
+                  {s.cast.filter((n) => castings[n] && castings[n].url).map((n) => (
+                    <a key={n} className="qs-casting__link" href={castings[n].url} target="_blank" rel="noreferrer">
+                      You used this clip for {n} ↗
+                    </a>
+                  ))}
+                  {found[s.index] ? (
+                    <input
+                      className="qs-input qs-casting__input"
+                      placeholder={`Keep the clip link for ${s.cast.join(' & ')} — paste it here…`}
+                      defaultValue={(castings[s.cast[0]] || {}).url || ''}
+                      onBlur={(e) => keepClip(s.cast, e.target.value.trim())}
+                      aria-label={`Clip link for ${s.cast.join(' and ')}`}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

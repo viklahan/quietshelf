@@ -35,7 +35,7 @@ def test_endpoint_returns_validated_shape(client, _ok, valid_script):
     segment = body["segments"][0]
     assert set(segment) == {
         "id", "script_text", "start_time", "end_time",
-        "search_terms", "clip_duration_seconds", "mood",
+        "search_terms", "clip_duration_seconds", "mood", "cast",
     }
 
 
