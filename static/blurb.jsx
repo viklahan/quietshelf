@@ -37,16 +37,26 @@ function RCard({ label, copyText, children }) {
 }
 
 function Blurb() {
-  const { Becoming } = window;
+  const { Becoming, useKeptDraft, loadLastMap, GroundRow } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | done
-  const [text, setText] = React.useState('');
+  const [text, setText] = useKeptDraft('qs.draft.blurb');
   const [file, setFile] = React.useState(null);
   const [tone, setTone] = React.useState('warm');
   const [length] = React.useState('medium');
   const [error, setError] = React.useState('');
   const [result, setResult] = React.useState(null);
+  // The saved Story Map, if one exists. Found maps ground by default; an
+  // imagined map is strictly opt-in — invention never flows in silently.
+  const [gmap] = React.useState(loadLastMap);
+  const [useMap, setUseMap] = React.useState(() => {
+    const m = loadLastMap();
+    return !!(m && !m.fabricated);
+  });
+  const [groundedBy, setGroundedBy] = React.useState(null); // {n, fabricated} of the run shown
   const fileRef = React.useRef(null);
+
+  const words = countWordsB(text);
 
   function onPick(e) {
     const f = e.target.files && e.target.files[0];
@@ -70,15 +80,20 @@ function Blurb() {
       setError('There’s not enough here yet. Paste a few paragraphs (50+ words), or bring the file.');
       return;
     }
+    const grounding = useMap && gmap ? gmap : null;
     setError('');
     setResult(null);
     setPhase('becoming');
     try {
       const [res] = await Promise.all([
-        window.QS_API.generateBlurb({ text, file, tone, length }),
+        window.QS_API.generateBlurb({
+          text, file, tone, length,
+          mapJson: grounding ? JSON.stringify(grounding) : undefined,
+        }),
         window.QS_API.calmDelay(1600),
       ]);
       setResult(res);
+      setGroundedBy(grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null);
       setPhase('done');
     } catch (err) {
       setError(err.message || 'Something went wrong. Try again.');
@@ -103,9 +118,16 @@ function Blurb() {
     const taglines = result.taglines || [];
     const keywords = result.keywords || [];
     const taglineCopy = taglines.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const { Stamp: QSStampB } = QSDS_blurb;
     return (
       <div className="qs-page qs-page--narrow">
         <p className="qs-lead">Here are your words. Take the ones that feel like the book.</p>
+        {groundedBy ? (
+          <p className="qs-quiethint" style={{ marginBottom: 'var(--space-6)' }}>
+            Grounded by your story map · {groundedBy.n} {groundedBy.n === 1 ? 'character' : 'characters'}
+            {groundedBy.fabricated ? <> <QSStampB tone="ember">Imagined</QSStampB></> : null}
+          </p>
+        ) : null}
         <div className="qs-results">
           <RCard label="Back-cover copy" copyText={result.back_cover}>
             <p className="qs-backcover">{result.back_cover}</p>
@@ -169,6 +191,16 @@ function Blurb() {
           </button>
         )}
         {file ? <p className="qs-quiethint" style={{ marginTop: 'var(--space-3)' }}>Using your file. I’ll read a representative sample of it.</p> : null}
+        {!file && text ? (
+          <div className="qs-meter">
+            <span><strong>{words.toLocaleString()}</strong> words</span>
+            <span aria-hidden="true">·</span>
+            <span>≈ <strong>{Math.max(1, Math.round(words / 230))}</strong> min read</span>
+            <span aria-hidden="true">·</span>
+            <span>draft kept</span>
+          </div>
+        ) : null}
+        {gmap ? <GroundRow map={gmap} use={useMap} onChange={setUseMap} /> : null}
         {error ? <p className="qs-note"><QSIcoBlurb name="circle-alert" size={16} />{error}</p> : null}
       </div>
 

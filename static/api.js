@@ -60,12 +60,15 @@
   }
 
   // POST /api/blurb (multipart Form) -> { back_cover, taglines[3], short_description, keywords[] }
-  async function generateBlurb({ text, file, tone, length }) {
+  // mapJson (optional): the writer's saved Story Map, as a JSON string — the
+  // backend turns it into a cast sheet that grounds the copy.
+  async function generateBlurb({ text, file, tone, length, mapJson }) {
     const fd = new FormData();
     if (file) fd.append('file', file);
     else fd.append('text', text || '');
     fd.append('tone', tone);
     fd.append('length', length);
+    if (mapJson) fd.append('map_json', mapJson);
 
     const resp = await fetch(BASE + '/api/blurb', { method: 'POST', body: fd });
     if (!resp.ok) {
@@ -75,11 +78,15 @@
   }
 
   // POST /api/promote (JSON) -> ShotList
-  async function promote(script) {
+  // storyMap (optional): the writer's saved Story Map object — grounds every
+  // chunk's search terms in the same confirmed cast.
+  async function promote(script, storyMap) {
+    const body = { script };
+    if (storyMap) body.story_map = storyMap;
     const resp = await fetch(BASE + '/api/promote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ script }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       throw await friendlyError(resp, 'Something went wrong reaching the mapping engine. Try again in a moment.');

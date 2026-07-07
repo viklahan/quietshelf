@@ -29,8 +29,27 @@ Produce a JSON object with exactly these fields:
 Respond with ONLY the JSON object. No markdown fences, no commentary.
 """
 
+# Appended when the writer attaches their Story Map: the cast sheet is
+# consistency ground truth, never new material to reveal or embellish.
+_CAST_ADDENDUM = """
 
-def generate_blurb(text: str, *, tone: Tone = Tone.literary, length: Length = Length.medium) -> BlurbResult:
+The writer also attached a cast sheet from their story map. It is ground truth
+for names, roles, and relationships - keep the copy consistent with it. It is
+NOT new plot to reveal and NOT license to invent scenes around those names.
+
+{cast}
+"""
+
+
+def generate_blurb(
+    text: str,
+    *,
+    tone: Tone = Tone.literary,
+    length: Length = Length.medium,
+    cast_context: str = "",
+) -> BlurbResult:
     system = _SYSTEM.format(tone=tone.value, length=length.value)
+    if cast_context:
+        system += _CAST_ADDENDUM.format(cast=cast_context)
     user = sample_text(text)
     return generate_json(system, user, BlurbResult)

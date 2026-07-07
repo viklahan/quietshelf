@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field
 
 class PromoteRequest(BaseModel):
     script: str = Field(..., description="Full script text, 100-3000 words.")
+    # Optional Story Map attachment (the raw map JSON the writer saved). The
+    # router validates it against the StoryMap contract; dict here keeps the
+    # wire format decoupled from the storymap module.
+    story_map: dict | None = None
 
 
 class Segment(BaseModel):

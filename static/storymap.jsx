@@ -155,10 +155,10 @@ function ImagineDoor({ prominent, busy, onImagine }) {
 }
 
 function StoryMapPage() {
-  const { Becoming, CopyButton } = window;
+  const { Becoming, CopyButton, useKeptDraft, saveLastMap } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | map | prompts
-  const [text, setText] = React.useState('');
+  const [text, setText] = useKeptDraft('qs.draft.storymap');
   const [file, setFile] = React.useState(null);
   const [error, setError] = React.useState('');
   const [map, setMap] = React.useState(null);          // StoryMap (found or imagined)
@@ -168,6 +168,7 @@ function StoryMapPage() {
   const [imagining, setImagining] = React.useState(false);
   const [lastImagine, setLastImagine] = React.useState(null); // for reroll
   const fileRef = React.useRef(null);
+  const mapFileRef = React.useRef(null);
 
   const words = countWordsSm(text);
 
@@ -213,6 +214,9 @@ function StoryMapPage() {
       setMap(result);
       setFoundMap(result);
       setLastImagine(null);
+      // Keep the map so Blurb and Promote can ground with it, and so a
+      // refresh doesn't cost the writer their session's reading.
+      if ((result.characters || []).length) saveLastMap(result);
       setPhase('map');
     } catch (err) {
       setError(err.message || 'Something went wrong. Try again.');
@@ -234,6 +238,7 @@ function StoryMapPage() {
         setPhase('prompts');
       } else {
         setMap(result);
+        if ((result.characters || []).length) saveLastMap(result);
         setPhase('map');
       }
     } catch (err) {
@@ -251,6 +256,43 @@ function StoryMapPage() {
     setScanNames([]);
     setLastImagine(null);
     setError('');
+  }
+
+  /* Save the map as a file the writer owns — re-loadable here, and the
+     grounding source for Blurb and Promote. */
+  function downloadMap(m) {
+    const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `story-map-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function onPickMap(e) {
+    const f = e.target.files && e.target.files[0];
+    if (mapFileRef.current) mapFileRef.current.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const m = JSON.parse(reader.result);
+        if (!m || !Array.isArray(m.characters) || !m.characters.length) {
+          setError('That file doesn’t look like a saved story map. Save one from this tab first.');
+          return;
+        }
+        setError('');
+        setMap(m);
+        if (!m.fabricated && m.story_detected) setFoundMap(m);
+        saveLastMap(m);
+        setPhase('map');
+      } catch (err) {
+        setError('That file doesn’t look like a saved story map. Save one from this tab first.');
+      }
+    };
+    reader.readAsText(f);
   }
 
   function notionText(m) {
@@ -373,6 +415,9 @@ function StoryMapPage() {
           </span>
           {!imagined ? <QSStamp tone="paper">{`confidence · ${map.confidence || 'low'}`}</QSStamp> : null}
           <span style={{ flex: 1 }}></span>
+          <button type="button" className="qs-copy" onClick={() => downloadMap(map)}>
+            <QSIcoSmap name="file-text" size={13} />Save map
+          </button>
           <CopyButton text={notionText(map)} label="Copy for Notion" />
         </div>
         {map.note ? <p className="qs-quiethint" style={{ margin: '0 0 var(--space-6) 0' }}>{map.note}</p> : null}
@@ -446,6 +491,10 @@ function StoryMapPage() {
         {!file && text ? (
           <div className="qs-meter">
             <span><strong>{words.toLocaleString()}</strong> words</span>
+            <span aria-hidden="true">·</span>
+            <span>≈ <strong>{Math.max(1, Math.round(words / 230))}</strong> min read</span>
+            <span aria-hidden="true">·</span>
+            <span>draft kept</span>
           </div>
         ) : null}
         {error ? <p className="qs-note"><QSIcoSmap name="circle-alert" size={16} />{error}</p> : null}
@@ -453,6 +502,10 @@ function StoryMapPage() {
 
       <div className="qs-actionrow">
         <QSBtnSmap size="lg" icon="search" onClick={mapStory}>Map my story</QSBtnSmap>
+        <input ref={mapFileRef} type="file" accept=".json,application/json" onChange={onPickMap} style={QS_SM_HIDDEN_INPUT} tabIndex={-1} />
+        <button type="button" className="qs-payoff__again" onClick={() => mapFileRef.current && mapFileRef.current.click()}>
+          Load a saved map
+        </button>
       </div>
       <p className="qs-quiethint" style={{ marginTop: 'var(--space-4)' }}>
         The map is a mirror — it reflects what you wrote and never invents.

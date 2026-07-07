@@ -41,13 +41,21 @@ function toCard(seg) {
 }
 
 function Promote() {
-  const { Becoming, CopyButton } = window;
+  const { Becoming, CopyButton, useKeptDraft, loadLastMap, GroundRow } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | done
-  const [text, setText] = React.useState('');
+  const [text, setText] = useKeptDraft('qs.draft.promote');
   const [error, setError] = React.useState('');
   const [found, setFound] = React.useState({});
   const [segs, setSegs] = React.useState([]);
+  // The saved Story Map, if one exists. Found maps ground by default; an
+  // imagined map is strictly opt-in — invention never flows in silently.
+  const [gmap] = React.useState(loadLastMap);
+  const [useMap, setUseMap] = React.useState(() => {
+    const m = loadLastMap();
+    return !!(m && !m.fabricated);
+  });
+  const [groundedBy, setGroundedBy] = React.useState(null); // {n, fabricated} of the run shown
 
   const words = countWords(text);
 
@@ -60,15 +68,17 @@ function Promote() {
       setError(`That’s a long piece (${words.toLocaleString()} words). Split it into parts of ${QS_MAX_WORDS.toLocaleString()} words or fewer.`);
       return;
     }
+    const grounding = useMap && gmap ? gmap : null;
     setError('');
     setFound({});
     setPhase('becoming');
     try {
       const [shotlist] = await Promise.all([
-        window.QS_API.promote(text),
+        window.QS_API.promote(text, grounding),
         window.QS_API.calmDelay(1600),
       ]);
       setSegs((shotlist.segments || []).map(toCard));
+      setGroundedBy(grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null);
       setPhase('done');
     } catch (err) {
       setError(err.message || 'Something went wrong. Try again.');
@@ -128,6 +138,12 @@ function Promote() {
           <span style={{ flex: 1 }}></span>
           <CopyButton text={notionText()} label="Copy for Notion" />
         </div>
+        {groundedBy ? (
+          <p className="qs-quiethint" style={{ margin: '0 0 var(--space-6) 0' }}>
+            Grounded by your story map · {groundedBy.n} {groundedBy.n === 1 ? 'character' : 'characters'}
+            {groundedBy.fabricated ? ' · imagined cast, on your request' : ''}
+          </p>
+        ) : null}
 
         <div className="qs-board">
           {segs.map((s, idx) => (
@@ -172,7 +188,9 @@ function Promote() {
         <span><strong>{words.toLocaleString()}</strong> words</span>
         <span aria-hidden="true">·</span>
         <span>≈ <strong>{runtimeFromWords(words)}</strong> runtime</span>
+        {text ? <><span aria-hidden="true">·</span><span>draft kept</span></> : null}
       </div>
+      {gmap ? <GroundRow map={gmap} use={useMap} onChange={setUseMap} /> : null}
       {error ? <p className="qs-note"><QSIcoPromo name="circle-alert" size={16} />{error}</p> : null}
       <div className="qs-actionrow">
         <QSBtnPromo size="lg" icon="sparkles" onClick={map}>Map my visuals</QSBtnPromo>

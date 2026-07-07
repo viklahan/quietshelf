@@ -14,6 +14,7 @@ from app.providers import JSONParseError, ProviderConfigError, ProviderError
 from app.services.blurb.extract import UnsupportedFormat, extract_text
 from app.services.blurb.generator import generate_blurb
 from app.services.blurb.models import BlurbResult, Length, Tone
+from app.services.storymap.grounding import MapParseError, cast_sheet, parse_map_json
 
 logger = logging.getLogger("quietshelf.blurb")
 
@@ -26,9 +27,19 @@ async def blurb(
     text: str | None = Form(None),
     tone: Tone = Form(Tone.literary),
     length: Length = Form(Length.medium),
+    map_json: str | None = Form(None),
     file: UploadFile | None = File(None),
     _: None = Depends(guard),
 ):
+    # Optional Story Map grounding. A bad attachment is a clear 422, never a
+    # silent un-grounded run the writer believes was grounded.
+    cast_context = ""
+    if map_json:
+        try:
+            cast_context = cast_sheet(parse_map_json(map_json))
+        except MapParseError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
     if file is not None:
         raw = await file.read()
         max_bytes = config.max_upload_mb() * 1024 * 1024
@@ -47,9 +58,12 @@ async def blurb(
             detail="Need more text to work with - paste at least a few paragraphs (50+ words).",
         )
 
-    logger.info("blurb_request words=%d tone=%s length=%s", len(manuscript.split()), tone.value, length.value)
+    logger.info(
+        "blurb_request words=%d tone=%s length=%s grounded=%s",
+        len(manuscript.split()), tone.value, length.value, bool(cast_context),
+    )
     try:
-        return generate_blurb(manuscript, tone=tone, length=length)
+        return generate_blurb(manuscript, tone=tone, length=length, cast_context=cast_context)
     except (JSONParseError, ProviderConfigError, ProviderError) as exc:
         return llm_error_to_response(
             exc,

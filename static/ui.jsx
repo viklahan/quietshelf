@@ -1,6 +1,59 @@
-/* Quiet Shelf — shared custom UI (shelf, finished book, the becoming, copy). */
+/* Quiet Shelf — shared custom UI (shelf, finished book, the becoming, copy,
+   kept drafts, and the story-map grounding row). */
 const QSDS = window.QuietFightClubDesignSystem_fae847;
 const { Icon } = QSDS;
+
+/* kept drafts — a refresh must never eat a writer's words ---------- */
+function useKeptDraft(key) {
+  const [value, setValue] = React.useState(() => {
+    try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+  });
+  const set = React.useCallback((next) => {
+    setValue(next);
+    try {
+      if (next) localStorage.setItem(key, next);
+      else localStorage.removeItem(key);
+    } catch (e) { /* private mode / full storage — the in-memory draft still works */ }
+  }, [key]);
+  return [value, set];
+}
+
+/* the last story map, kept so other tabs can ground with it -------- */
+const QS_LAST_MAP_KEY = 'qs.storymap.last';
+
+function loadLastMap() {
+  try {
+    const raw = localStorage.getItem(QS_LAST_MAP_KEY);
+    if (!raw) return null;
+    const m = JSON.parse(raw);
+    if (!m || !Array.isArray(m.characters) || !m.characters.length) return null;
+    return m;
+  } catch (e) { return null; }
+}
+
+function saveLastMap(m) {
+  try { localStorage.setItem(QS_LAST_MAP_KEY, JSON.stringify(m)); } catch (e) {}
+}
+
+/* "Ground with your story map" — the quiet opt-in row Blurb and
+   Promote share. The Imagined stamp travels with an imagined map. */
+function GroundRow({ map, use, onChange }) {
+  const { Stamp } = QSDS;
+  const n = (map.characters || []).length;
+  return (
+    <div className="qs-groundrow">
+      <button
+        type="button"
+        className={`qs-pill${use ? ' qs-pill--on' : ''}`}
+        aria-pressed={use}
+        onClick={() => onChange(!use)}
+      >
+        <Icon name="book-open" size={13} /> Ground with your story map · {n} {n === 1 ? 'character' : 'characters'}
+      </button>
+      {map.fabricated ? <Stamp tone="ember">Imagined</Stamp> : null}
+    </div>
+  );
+}
 
 /* copy-to-clipboard with a soft, brief "copied" confirmation -------- */
 function useCopied(timeout = 1600) {
@@ -114,4 +167,5 @@ function StepLabel({ n, children }) {
 
 Object.assign(window, {
   useCopied, CopyButton, Shelf, Spine, FinishedBook, Becoming, StepLabel,
+  useKeptDraft, loadLastMap, saveLastMap, GroundRow,
 });

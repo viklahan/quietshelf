@@ -60,6 +60,20 @@ Cover the COMPLETE excerpt from start to finish. Never summarize, skip, or stop 
 Respond with ONLY a valid JSON object matching this structure. No markdown fences, no commentary, no preamble.
 """
 
+# Appended when the writer attaches their Story Map. The sheet makes search
+# terms CONCRETE and consistent across segments (the same character keeps the
+# same look and places), but the excerpt on the page always wins.
+CAST_ADDENDUM = """
+
+The writer attached a cast sheet from their story map. When a segment involves
+a named character, use their appearance, places, and objects from the sheet to
+make search terms concrete and consistent across segments (e.g. "woman red coat
+harbor dusk" instead of a generic person). Never let sheet details override
+what the excerpt actually says.
+
+{cast}
+"""
+
 # Tiny stop-word set for the local fallback keyword extractor.
 _STOPWORDS = set(
     "the a an and or but of to in on at for with from by as is was were are be been "
@@ -110,7 +124,7 @@ def _keywords(text: str, count: int = 6) -> list[str]:
     return picked[:count]
 
 
-def _map_chunk(chunk: str) -> ChunkResult:
+def _map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult:
     """Map one excerpt, retrying the two transient upstream failures.
 
     Rate limits: the provider layer paces requests client-side, so a 429 here
@@ -127,7 +141,7 @@ def _map_chunk(chunk: str) -> ChunkResult:
     upstream_retries = 0
     while True:
         try:
-            return generate_json(SYSTEM_PROMPT, chunk, ChunkResult)
+            return generate_json(system, chunk, ChunkResult)
         except ProviderRateLimited:
             if rate_retries >= RATE_LIMIT_RETRIES:
                 raise
@@ -142,13 +156,13 @@ def _map_chunk(chunk: str) -> ChunkResult:
             time.sleep(2.0)
 
 
-def _try_map_chunk(chunk: str) -> ChunkResult | None:
+def _try_map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult | None:
     """Returns None (-> local fallback) only when the model RESPONDED but its
     output was unparseable. Infrastructure failures (rate limit, upstream error,
     bad key) propagate so the writer gets an honest "try again" instead of a
     whole script silently degraded to keyword-only mapping."""
     try:
-        return _map_chunk(chunk)
+        return _map_chunk(chunk, system)
     except JSONParseError:
         logger.warning("chunk_parse_failed -> local fallback")
         return None
@@ -175,17 +189,20 @@ def _fallback_chunk(chunk: str) -> ChunkResult:
     return ChunkResult(video_title_suggestion="", segments=segments)
 
 
-def map_script(script: str) -> ShotList:
-    """Map a full script to a validated shot list via parallel chunk mapping."""
+def map_script(script: str, cast_context: str = "") -> ShotList:
+    """Map a full script to a validated shot list via parallel chunk mapping.
+    cast_context, when present, is the writer's Story Map cast sheet - every
+    chunk sees it so search terms stay consistent across the whole piece."""
+    system = SYSTEM_PROMPT + (CAST_ADDENDUM.format(cast=cast_context) if cast_context else "")
     chunks = _chunk_script(script, CHUNK_TARGET_WORDS)
-    logger.info("promote_map chunks=%d", len(chunks))
+    logger.info("promote_map chunks=%d grounded=%s", len(chunks), bool(cast_context))
 
     if len(chunks) == 1:
-        results: list[ChunkResult | None] = [_try_map_chunk(chunks[0])]
+        results: list[ChunkResult | None] = [_try_map_chunk(chunks[0], system)]
     else:
         workers = min(_max_concurrency(), len(chunks))
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            results = list(pool.map(_try_map_chunk, chunks))
+            results = list(pool.map(lambda chunk: _try_map_chunk(chunk, system), chunks))
 
     # A chunk the model couldn't parse drops straight to a local coarse mapping
     # - never burn more slow model calls chasing one bad chunk (that turned a
