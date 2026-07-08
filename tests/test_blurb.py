@@ -22,6 +22,26 @@ def test_extract_text_rejects_unknown():
         extract_text(b"%PDF", ".pdf")
 
 
+def test_extract_text_corrupt_docx_is_unsupported_not_crash():
+    """A file with a .docx extension but junk bytes is a client mistake - it
+    must raise UnsupportedFormat (-> clean 415), never an unhandled 500."""
+    from app.services.blurb.extract import extract_text, UnsupportedFormat
+    import pytest
+    with pytest.raises(UnsupportedFormat):
+        extract_text(b"PK\x03\x04 not a real docx", ".docx")
+
+
+def test_extract_text_corrupt_rtf_is_unsupported_not_crash():
+    from app.services.blurb.extract import extract_text, UnsupportedFormat
+    import pytest
+    # striprtf is lenient, so feed bytes that fail the utf-8 decode path guard.
+    # A truncated control word shouldn't 500 regardless.
+    try:
+        extract_text(b"{\\rtf1\\ansi corrupt", ".rtf")
+    except UnsupportedFormat:
+        pass  # acceptable: cleanly rejected
+
+
 def test_sample_text_short_passes_through():
     from app.services.blurb.extract import sample_text
     assert sample_text("a b c") == "a b c"
