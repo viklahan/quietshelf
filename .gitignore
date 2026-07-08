@@ -16,3 +16,7 @@ _ui_err.log
 
 # Playwright MCP run artifacts
 .playwright-mcp/
+
+# Local screenshots / captures (kept out of the repo, not deleted)
+/storymap-live.png
+/frontend/data/

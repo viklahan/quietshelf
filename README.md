@@ -18,11 +18,30 @@ billing, no paid AI keys.
 Each service is fully independent — they share only the provider layer and file
 ingestion, never each other.
 
-## Run it free (Gemini)
+### The map is the pipeline
+
+Save a Story Map and you can **ground** Blurb and Promote with it: the confirmed
+cast becomes shared truth, so names, roles, and relationships stay consistent
+instead of being re-guessed on every run. Promote also reuses the same
+stock-footage search per character across segments, so the same person keeps the
+same look through the whole video. The honesty rule travels: a *found* map
+grounds by default, an *imagined* one only when you opt in, and the "imagined"
+stamp follows the data everywhere it goes.
+
+## Quickest start (Windows)
+
+Double-click **`Start Quiet Shelf.bat`**. First run sets up its own Python
+environment and installs dependencies; after that it just opens the app in your
+browser at http://localhost:8090. Built so a non-technical writer can run it
+without a terminal. (You still need a free AI key in `.env` — see below.)
+
+## Run it free (Gemini or Groq)
 
 1. `git clone` this repo.
-2. Get a free Gemini API key (no card) at https://aistudio.google.com.
-3. `cp .env.example .env` and paste the key into `GEMINI_API_KEY`.
+2. Get a free key (no card): Gemini at https://aistudio.google.com, or Groq at
+   https://console.groq.com.
+3. `cp .env.example .env`, set `LLM_PROVIDER` to `gemini` or `groq`, and paste
+   the matching key.
 4. `docker compose up --build`
 5. Open http://localhost:8000
 
