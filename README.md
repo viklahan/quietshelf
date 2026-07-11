@@ -1,4 +1,4 @@
-# <img src="static/assets/logo-mark.png" width="36" alt="" /> Quiet Shelf
+# <img width="654" height="969" alt="thick_medium" src="https://github.com/user-attachments/assets/cefc59a2-bc2e-4851-8461-7121dc604407" /> Quiet Shelf
 
 Hand over the hard part. Quiet Shelf takes a writer's manuscript and quietly
 returns finished, sellable, promotable things — your story, on the shelf. It's
