@@ -155,7 +155,7 @@ function ImagineDoor({ prominent, busy, onImagine }) {
 }
 
 function StoryMapPage() {
-  const { Becoming, CopyButton, useKeptDraft, saveLastMap } = window;
+  const { Becoming, CopyButton, useKeptDraft, saveLastMap, Tooltip } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | map | prompts
   const [text, setText] = useKeptDraft('qs.draft.storymap');
@@ -422,6 +422,7 @@ function StoryMapPage() {
             {String(cast.length).padStart(2, '0')} {cast.length === 1 ? 'character' : 'characters'}
             {imagined ? ' imagined' : ' found'}
           </span>
+          {!imagined ? <Tooltip text="Confidence is the engine's own read on how clear this story was to map — not a judgment of your writing. Each card below also shows dots for importance: more filled means more central to the story." /> : null}
           {!imagined ? <QSStamp tone="paper">{`confidence · ${map.confidence || 'low'}`}</QSStamp> : null}
           <span style={{ flex: 1 }}></span>
           <button type="button" className="qs-copy" onClick={() => downloadMap(map)}>

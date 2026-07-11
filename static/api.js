@@ -141,6 +141,17 @@
     return await resp.json();
   }
 
+  // POST /api/feedback (JSON {message}) -> {ok:true}
+  async function sendFeedback(message) {
+    const resp = await fetch(BASE + '/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!resp.ok) throw await friendlyError(resp, 'Could not send that just now.');
+    return await resp.json();
+  }
+
   // A small, honest pause so "the becoming" never flashes by. Real work
   // usually takes longer than this; this only matters for very fast calls.
   function calmDelay(ms) {
@@ -150,6 +161,6 @@
   window.QS_API = {
     fetchThemes, formatBook, generateBlurb, promote,
     storymapScan, storymapMap, storymapImagine,
-    health, calmDelay,
+    health, sendFeedback, calmDelay,
   };
 })();

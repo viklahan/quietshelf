@@ -37,7 +37,7 @@ function RCard({ label, copyText, children }) {
 }
 
 function Blurb() {
-  const { Becoming, useKeptDraft, loadLastMap, GroundRow } = window;
+  const { Becoming, useKeptDraft, loadLastMap, GroundRow, Tooltip } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | done
   const [text, setText] = useKeptDraft('qs.draft.blurb');
@@ -205,7 +205,7 @@ function Blurb() {
       </div>
 
       <div className="qs-step">
-        <p className="qs-steplabel">How should it sound?</p>
+        <p className="qs-steplabel">How should it sound? <Tooltip text="Warm: friendly and personal. Literary: elevated, evocative prose. Punchy: short lines, fast hooks. Mysterious: intriguing, holds a little back." /></p>
         <div className="qs-pills">
           {QS_TONES.map((t) => (
             <button

@@ -116,17 +116,35 @@ function Spine({ title, height = 118, tone }) {
   );
 }
 
-/* The finished book — front cover, spine, page edges. The payoff. */
-function FinishedBook({ title, author }) {
+/* The finished book — front cover, spine, page edges. The payoff.
+   coverUrl (a real uploaded image) takes priority; otherwise bg/ink let the
+   caller match the ACTUAL theme colors instead of a generic dark mockup.
+   All three are optional so existing callers (e.g. Home's decorative use)
+   keep working unchanged. */
+function FinishedBook({ title, author, coverUrl, bg, ink }) {
+  if (coverUrl) {
+    return (
+      <div className="qs-bookstage">
+        <div className="qs-book" role="img" aria-label={`${title} by ${author}, a finished ebook`}>
+          <div className="qs-book__pages" aria-hidden="true"></div>
+          <div className="qs-book__spine" aria-hidden="true"><span>{title}</span></div>
+          <div
+            className="qs-book__face"
+            style={{ backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+          ></div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="qs-bookstage">
       <div className="qs-book" role="img" aria-label={`${title} by ${author}, a finished ebook`}>
         <div className="qs-book__pages" aria-hidden="true"></div>
         <div className="qs-book__spine" aria-hidden="true"><span>{title}</span></div>
-        <div className="qs-book__face">
-          <div className="qs-book__rule" aria-hidden="true"></div>
-          <h3 className="qs-book__title">{title}</h3>
-          <span className="qs-book__author">{author}</span>
+        <div className="qs-book__face" style={bg ? { background: bg } : undefined}>
+          <div className="qs-book__rule" aria-hidden="true" style={ink ? { background: ink } : undefined}></div>
+          <h3 className="qs-book__title" style={ink ? { color: ink } : undefined}>{title}</h3>
+          <span className="qs-book__author" style={ink ? { color: ink } : undefined}>{author}</span>
         </div>
       </div>
     </div>
@@ -165,7 +183,84 @@ function StepLabel({ n, children }) {
   );
 }
 
+/* Tooltip — a small "?" affordance that reveals one short line on hover/focus.
+   Shared across every tab so a control never needs guessing before you commit
+   to it. Keyboard accessible (focus shows it same as hover); one instance of
+   its CSS injected once, like the other components in this file. */
+function injectTooltipCss() {
+  if (typeof document === 'undefined' || document.getElementById('qs-tooltip-css')) return;
+  const el = document.createElement('style');
+  el.id = 'qs-tooltip-css';
+  el.textContent = `
+.qs-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.qs-tip__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid var(--edge-strong);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  background: transparent;
+  cursor: help;
+  transition: color var(--dur-fast) var(--ease-quiet), border-color var(--dur-fast) var(--ease-quiet);
+}
+.qs-tip__trigger:hover, .qs-tip__trigger:focus-visible {
+  color: var(--ember-400);
+  border-color: rgba(197, 137, 59, 0.55);
+  outline: none;
+}
+.qs-tip__bubble {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  min-width: 160px;
+  max-width: 240px;
+  width: max-content;
+  background: var(--surface-raised);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-card);
+  color: var(--text-body);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  line-height: 1.35;
+  padding: 7px 10px;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-quiet), transform var(--dur-fast) var(--ease-quiet);
+}
+.qs-tip__trigger:hover + .qs-tip__bubble,
+.qs-tip__trigger:focus-visible + .qs-tip__bubble {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+`;
+  document.head.appendChild(el);
+}
+
+function Tooltip({ text, label = 'More info' }) {
+  injectTooltipCss();
+  return (
+    <span className="qs-tip">
+      <button type="button" className="qs-tip__trigger" aria-label={label} tabIndex={0}>?</button>
+      <span className="qs-tip__bubble" role="tooltip">{text}</span>
+    </span>
+  );
+}
+
 Object.assign(window, {
-  useCopied, CopyButton, Shelf, Spine, FinishedBook, Becoming, StepLabel,
+  useCopied, CopyButton, Shelf, Spine, FinishedBook, Becoming, StepLabel, Tooltip,
   useKeptDraft, loadLastMap, saveLastMap, GroundRow,
 });

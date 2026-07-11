@@ -20,13 +20,17 @@ function App() {
   else if (tab === 'blurb') view = <window.Blurb />;
   else if (tab === 'promote') view = <window.Promote />;
   else if (tab === 'storymap') view = <window.StoryMapPage />;
+  else if (tab === 'about') view = <window.About onNavigate={setTab} />;
 
   return (
     <div className="qs-app">
       <header className="qs-header">
         <button type="button" className="qs-brand" onClick={() => setTab('home')} aria-label="Quiet Shelf, home">
-          <span className="qs-brand__name">Quiet Shelf</span>
-          <span className="qs-brand__sub">Your story, made real.</span>
+          <img src="/static/assets/logo-mark.png" alt="" width="26" height="26" style={{ display: 'block' }} />
+          <span className="qs-brand__text">
+            <span className="qs-brand__name">Quiet Shelf</span>
+            <span className="qs-brand__sub">Your story, made real.</span>
+          </span>
         </button>
         <nav className="qs-nav" aria-label="Sections">
           {QS_TABS.map((t) => (
@@ -41,6 +45,15 @@ function App() {
               <span>{t.label}</span>
             </button>
           ))}
+          <button
+            type="button"
+            className={`qs-nav__tab${tab === 'about' ? ' qs-nav__tab--active' : ''}`}
+            onClick={() => setTab('about')}
+            aria-current={tab === 'about' ? 'page' : undefined}
+            style={{ opacity: 0.7 }}
+          >
+            <span>About</span>
+          </button>
         </nav>
       </header>
       <main className="qs-main" key={tab}>{view}</main>

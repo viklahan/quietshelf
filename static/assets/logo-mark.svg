@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Quiet Shelf mark: inkpot + quill on a shelf. Feather redesigned as an
+       elongated, angular flag shape (not a rounded blob, which read as a
+       candle flame / lipstick) and colored white. Pot given a visibly
+       flared, bulbous body so it reads as a vessel-with-an-opening. -->
+  <rect x="5" y="47" width="54" height="7" rx="2" fill="#c5893b"/>
+
+  <path d="M20 47
+           L20 40
+           Q20 36 24 35
+           Q20 32 22 28
+           Q26 25 32 25
+           Q38 25 42 28
+           Q44 32 40 35
+           Q44 36 44 40
+           L44 47
+           Z" fill="#7e2b23"/>
+  <ellipse cx="32" cy="25.5" rx="11" ry="3.2" fill="#d9a458"/>
+
+  <g transform="rotate(20 30 25)">
+    <rect x="28.8" y="6" width="2.4" height="30" rx="1.2" fill="#c5893b"/>
+    <path d="M30 4
+             C 21 6, 13 12, 14 22
+             C 15 27, 19 29, 24 27
+             C 22 22, 22 16, 25 11
+             C 27 8, 29 6, 30 4 Z"
+          fill="#ffffff"/>
+    <path d="M30 6 C 25 10, 21 16, 20 24" stroke="#c9c2b4" stroke-width="0.7" fill="none"/>
+  </g>
+</svg>

@@ -3,16 +3,20 @@ health check and the static frontend."""
 from __future__ import annotations
 
 import logging
+import datetime
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from app import config
+from app.deps import guard
 from app.providers import validate_startup
 from app.services.blurb.router import router as blurb_router
 from app.services.format.router import router as format_router
@@ -73,6 +77,28 @@ def health() -> dict:
         "provider": config.provider_name(),
         "services": ["format", "blurb", "promote", "storymap"],
     }
+
+
+FEEDBACK_FILE = Path(__file__).resolve().parent.parent / "feedback.jsonl"
+
+
+class FeedbackIn(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+
+
+@app.post("/api/feedback")
+def submit_feedback(body: FeedbackIn, _: None = Depends(guard)) -> dict:
+    """Append a suggestion/bug report to a local file. No email involved at
+    all — nothing to expose, nothing to configure, just a file the person
+    running the server reads. Same access guard as the four tools."""
+    entry = {"ts": datetime.datetime.utcnow().isoformat() + "Z", "message": body.message.strip()}
+    try:
+        with FEEDBACK_FILE.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        logger.exception("feedback_write_failed")
+        raise HTTPException(status_code=500, detail="Couldn't save that just now.")
+    return {"ok": True}
 
 
 if STATIC_DIR.is_dir():

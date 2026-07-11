@@ -76,8 +76,18 @@ function ThemeCard({ theme, selected, onSelect }) {
   );
 }
 
+/* Mirrors cover.py's own _PALETTE exactly, so when no cover is uploaded the
+   payoff screen's colors match the REAL generated cover, not a generic dark
+   mockup. Keep this in sync if cover.py's palette ever changes. */
+const QS_COVER_PALETTE = {
+  classic: { bg: '#f4f0e8', ink: '#28221c' },
+  cozy: { bg: '#f7f1ee', ink: '#3c2e2e' },
+  modern: { bg: '#fafafa', ink: '#18181c' },
+  children: { bg: '#fff8e6', ink: '#2c3e50' },
+};
+
 function Format() {
-  const { Shelf, FinishedBook, Becoming, StepLabel } = window;
+  const { Shelf, FinishedBook, Becoming, StepLabel, Tooltip } = window;
 
   const [phase, setPhase] = React.useState('compose'); // compose | becoming | done
   const [storyFile, setStoryFile] = React.useState(null);
@@ -91,6 +101,16 @@ function Format() {
 
   const fileRef = React.useRef(null);
   const coverRef = React.useRef(null);
+
+  // A real preview of the uploaded cover, lifecycle-managed: created once per
+  // coverFile change, revoked on change/unmount so we never leak blob URLs.
+  const [coverPreviewUrl, setCoverPreviewUrl] = React.useState(null);
+  React.useEffect(() => {
+    if (!coverFile) { setCoverPreviewUrl(null); return undefined; }
+    const url = URL.createObjectURL(coverFile);
+    setCoverPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [coverFile]);
 
   React.useEffect(() => {
     let alive = true;
@@ -188,7 +208,13 @@ function Format() {
         <p className="qs-payoff__sub">Your story, on the shelf — real.</p>
         <div className="qs-shelfwrap qs-shelfwrap--lg">
           <Shelf lit={true}>
-            <FinishedBook title={title || 'Your book'} author={author || ' '} />
+            <FinishedBook
+              title={title || 'Your book'}
+              author={author || ' '}
+              coverUrl={coverPreviewUrl}
+              bg={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).bg}
+              ink={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).ink}
+            />
           </Shelf>
         </div>
         <div className="qs-payoff__action">
@@ -264,7 +290,9 @@ function Format() {
 
       {/* 4 — Cover (optional) */}
       <div className="qs-step">
-        <StepLabel n="4">Cover <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>— optional</span></StepLabel>
+        <StepLabel n="4">Cover <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>— optional</span>{' '}
+          <Tooltip text="JPG or PNG work best. No cover? I'll make a simple one for you." />
+        </StepLabel>
         <input ref={coverRef} type="file" accept="image/*" onChange={onPickCover} style={QS_HIDDEN_INPUT} tabIndex={-1} />
         {coverName ? (
           <div className="qs-file qs-drop--filled">
