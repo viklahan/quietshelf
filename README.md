@@ -74,6 +74,19 @@ quiet-shelf health
 for a fresh take. Every CLI command runs in-process with the same provider
 config as the server.
 
+## Screenshots
+
+<img width="1193" height="1552" alt="AboutTab" src="https://github.com/user-attachments/assets/5de93fad-48a3-4aef-ab7f-e60842c8901b" />
+
+<img width="1123" height="1422" alt="BlurbTab" src="https://github.com/user-attachments/assets/94ab33af-11ff-42d7-9576-f4248ec9d916" />
+
+<img width="773" height="1757" alt="FormatTab" src="https://github.com/user-attachments/assets/97d17753-f9bc-44e7-9142-53276334df48" />
+
+<img width="1218" height="817" alt="PromoteTab" src="https://github.com/user-attachments/assets/467db270-d50b-43d4-851b-b8f2eb0e1325" />
+
+<img width="1022" height="1198" alt="StoryMapTab" src="https://github.com/user-attachments/assets/eeeee1d0-5bc6-4fdb-931d-43c5ad00307d" />
+
+
 ## A note on EPUBs
 
 EPUB is reflowable: we preserve your structure, styling, images, and embed the
