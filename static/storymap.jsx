@@ -54,6 +54,180 @@ function Importance({ n }) {
   );
 }
 
+/* ---- Corkboard view: the map as a pinboard. Layout starts deterministic
+   (importance-weighted: lead at center, others around); once the writer
+   drags a card the positions are theirs — saved into the map object, so
+   they survive refresh and travel inside the downloaded map file. Threads
+   come straight from the extracted relationships; the label ON the line is
+   the relationship type. Nothing here invents — it renders what was found. */
+const QS_CORK_W = 1200;
+const QS_CORK_H = 680;
+const QS_CARD_W = 190;
+
+function qsCharId(c, i) { return c.id || ('c' + i); }
+
+function computeCorkLayout(cast) {
+  const cx = QS_CORK_W / 2 - QS_CARD_W / 2;
+  const cy = QS_CORK_H / 2 - 80;
+  const sorted = cast.map((c, i) => ({ c, i })).sort((a, b) => (b.c.importance || 3) - (a.c.importance || 3));
+  const pos = {};
+  sorted.forEach((entry, rank) => {
+    const id = qsCharId(entry.c, entry.i);
+    if (rank === 0) { pos[id] = { x: cx, y: cy }; return; }
+    const others = Math.max(1, sorted.length - 1);
+    const angle = ((rank - 1) / others) * Math.PI * 2 - Math.PI / 2;
+    const jx = ((entry.i * 137) % 48) - 24;
+    const jy = ((entry.i * 89) % 40) - 20;
+    pos[id] = {
+      x: Math.round(Math.max(8, Math.min(QS_CORK_W - QS_CARD_W - 8, cx + Math.cos(angle) * 420 + jx))),
+      y: Math.round(Math.max(14, Math.min(QS_CORK_H - 160, cy + Math.sin(angle) * 215 + jy))),
+    };
+  });
+  return pos;
+}
+
+/* relationship type → yarn color, from the app's own ink/ember palette */
+function qsRelStroke(label) {
+  const t = (label || '').toLowerCase();
+  if (/(rival|enem|antagon|conflict|betray|oppos)/.test(t)) return '#7e2b23';
+  if (/(love|romance|spouse|partner|married|crush)/.test(t)) return '#d9a458';
+  if (/(family|father|mother|parent|sibling|brother|sister|son|daughter|cousin|grand)/.test(t)) return '#c5893b';
+  return '#a89b82';
+}
+
+/* one thread per relationship pair+type, even when both sides declare it */
+function buildThreads(cast) {
+  const idset = {};
+  cast.forEach((c, i) => { idset[qsCharId(c, i)] = true; });
+  const seen = {};
+  const out = [];
+  cast.forEach((c, i) => {
+    const a = qsCharId(c, i);
+    (c.relationships || []).forEach((r) => {
+      const b = r.with;
+      if (!b || !idset[b] || b === a) return;
+      const key = (a < b ? a + '|' + b : b + '|' + a) + '|' + (r.type || 'other');
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ key, a, b, label: r.type || 'connected' });
+    });
+  });
+  return out;
+}
+
+function CorkBoard({ cast, positions, onChange, onCommit, selectedId, onSelect }) {
+  const canvasRef = React.useRef(null);
+  const frameRef = React.useRef(null);
+  const dragRef = React.useRef(null);
+  const threads = buildThreads(cast);
+  // Fit the whole 1200x680 board inside whatever width the page gives us —
+  // no scrollbars, the full picture at once. Drag math divides by the same
+  // scale so the card tracks the cursor exactly.
+  const [scale, setScale] = React.useState(1);
+  React.useEffect(() => {
+    function fit() {
+      if (!frameRef.current) return;
+      const w = frameRef.current.clientWidth;
+      setScale(Math.min(1, w / QS_CORK_W));
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  function down(id, e) {
+    e.preventDefault();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const p = positions[id] || { x: 0, y: 0 };
+    dragRef.current = { id, dx: (e.clientX - rect.left) / scale - p.x, dy: (e.clientY - rect.top) / scale - p.y, moved: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+  }
+
+  function move(e) {
+    const d = dragRef.current;
+    if (!d || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.round(Math.max(4, Math.min(QS_CORK_W - QS_CARD_W - 4, (e.clientX - rect.left) / scale - d.dx)));
+    const y = Math.round(Math.max(10, Math.min(QS_CORK_H - 100, (e.clientY - rect.top) / scale - d.dy)));
+    const cur = positions[d.id];
+    if (!d.moved && cur && Math.abs(x - cur.x) < 4 && Math.abs(y - cur.y) < 4) return;
+    d.moved = true;
+    onChange({ ...positions, [d.id]: { x, y } });
+  }
+
+  function up() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    if (d.moved) onCommit(); else onSelect(d.id);
+  }
+
+  return (
+    <div className="qs-cork" ref={frameRef} style={{ height: Math.round(QS_CORK_H * scale) + 'px' }}>
+      <div
+        ref={canvasRef}
+        className="qs-cork__canvas"
+        style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+      >
+        <svg className="qs-cork__svg" aria-hidden="true">
+          {threads.map((t) => {
+            const pa = positions[t.a];
+            const pb = positions[t.b];
+            if (!pa || !pb) return null;
+            const x1 = pa.x + QS_CARD_W / 2, y1 = pa.y + 4;
+            const x2 = pb.x + QS_CARD_W / 2, y2 = pb.y + 4;
+            const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + 30;
+            const lx = 0.25 * x1 + 0.5 * mx + 0.25 * x2;
+            const ly = 0.25 * y1 + 0.5 * my + 0.25 * y2;
+            const col = qsRelStroke(t.label);
+            return (
+              <g key={t.key}>
+                <path d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="3" strokeLinecap="round" transform="translate(1,2)" />
+                <path d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`} fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" />
+                <foreignObject x={lx - 60} y={ly - 11} width="120" height="22" style={{ overflow: 'visible' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <span className="qs-corklabel" style={{ borderColor: col }}>{t.label}</span>
+                  </div>
+                </foreignObject>
+              </g>
+            );
+          })}
+        </svg>
+        {cast.map((c, i) => {
+          const id = qsCharId(c, i);
+          const p = positions[id];
+          if (!p) return null;
+          const tex = c.texture || {};
+          const texLine = QS_TEXTURE_LABELS.map(([k]) => tex[k]).find(Boolean);
+          return (
+            <div
+              key={id}
+              className={`qs-pincard${selectedId === id ? ' qs-pincard--sel' : ''}`}
+              style={{ left: p.x + 'px', top: p.y + 'px' }}
+              onPointerDown={(e) => down(id, e)}
+              onPointerMove={move}
+              onPointerUp={up}
+              role="button"
+              tabIndex={0}
+              aria-label={`${c.name}, ${c.role || 'supporting'}`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(id); } }}
+            >
+              <span className="qs-pincard__pin" aria-hidden="true"></span>
+              <h4 className="qs-pincard__name">{c.name}</h4>
+              <div className="qs-pincard__meta">
+                <QSStamp tone={roleTone(c.role)}>{c.role || 'supporting'}</QSStamp>
+                <Importance n={c.importance} />
+              </div>
+              {texLine ? <p className="qs-pincard__tex">{texLine}</p> : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CharacterCard({ ch, names, imagined }) {
   const texture = ch.texture || {};
   const textureRows = QS_TEXTURE_LABELS.filter(([k]) => texture[k]);
@@ -154,6 +328,96 @@ function ImagineDoor({ prominent, busy, onImagine }) {
   );
 }
 
+/* Edit a character — the writer's hand on the map. Saving writes into the
+   map itself: the corkboard card updates, localStorage keeps it, and the
+   downloaded map file carries it. This isn't the Imagine door — nothing is
+   invented; the writer is correcting their own reflection. */
+function EditCharacterPanel({ ch, onSave, onCancel }) {
+  const [name, setName] = React.useState(ch.name || '');
+  const [role, setRole] = React.useState(ch.role || '');
+  const [importance, setImportance] = React.useState(Math.max(1, Math.min(5, ch.importance || 3)));
+  const [personality, setPersonality] = React.useState(ch.personality || '');
+  const [arc, setArc] = React.useState(ch.arc || '');
+  const [texture, setTexture] = React.useState(() => ({ ...(ch.texture || {}) }));
+
+  function save() {
+    const cleanTex = {};
+    Object.keys(texture).forEach((k) => {
+      const v = (texture[k] || '').trim();
+      if (v) cleanTex[k] = v;
+    });
+    onSave({
+      name: name.trim() || ch.name,
+      role: role.trim() || ch.role,
+      importance,
+      personality: personality.trim(),
+      arc: arc.trim(),
+      texture: cleanTex,
+    });
+  }
+
+  const labelStyle = { display: 'block', margin: '0 0 4px', fontSize: 'var(--fs-small)', color: 'var(--text-faint)' };
+  const rowStyle = { marginTop: 'var(--space-4)' };
+
+  return (
+    <section className="qs-char" style={{ marginTop: 'var(--space-6)' }}>
+      <div className="qs-char__head">
+        <h3 className="qs-char__name">Editing</h3>
+        <span className="qs-char__meta"><QSStamp tone="paper">yours to change</QSStamp></span>
+      </div>
+
+      <div style={rowStyle}>
+        <label style={labelStyle} htmlFor="qs-edit-name">Name</label>
+        <input id="qs-edit-name" className="qs-input" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+
+      <div style={rowStyle}>
+        <label style={labelStyle} htmlFor="qs-edit-role">Role</label>
+        <input id="qs-edit-role" className="qs-input" value={role} onChange={(e) => setRole(e.target.value)} placeholder="protagonist, rival, mentor…" />
+      </div>
+
+      <div style={rowStyle}>
+        <span style={labelStyle}>Importance</span>
+        <div className="qs-pills">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button key={n} type="button" className={`qs-pill${importance === n ? ' qs-pill--on' : ''}`}
+              onClick={() => setImportance(n)} aria-pressed={importance === n}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={rowStyle}>
+        <label style={labelStyle} htmlFor="qs-edit-personality">Personality</label>
+        <textarea id="qs-edit-personality" className="qs-input" style={{ minHeight: '72px', resize: 'vertical' }}
+          value={personality} onChange={(e) => setPersonality(e.target.value)} />
+      </div>
+
+      <div style={rowStyle}>
+        <label style={labelStyle} htmlFor="qs-edit-arc">Arc</label>
+        <textarea id="qs-edit-arc" className="qs-input" style={{ minHeight: '56px', resize: 'vertical' }}
+          value={arc} onChange={(e) => setArc(e.target.value)} />
+      </div>
+
+      {QS_TEXTURE_LABELS.map(([k, label]) => (
+        <div style={rowStyle} key={k}>
+          <label style={labelStyle} htmlFor={`qs-edit-tex-${k}`}>{label}</label>
+          <input id={`qs-edit-tex-${k}`} className="qs-input" value={texture[k] || ''}
+            onChange={(e) => setTexture((t) => ({ ...t, [k]: e.target.value }))} />
+        </div>
+      ))}
+
+      <div className="qs-actionrow">
+        <QSBtnSmap size="lg" icon="feather" onClick={save}>Save changes</QSBtnSmap>
+        <button type="button" className="qs-payoff__again" onClick={onCancel}>Cancel</button>
+      </div>
+      <p className="qs-quiethint" style={{ marginTop: 'var(--space-3)' }}>
+        Your edits become part of the map — they save with it and travel in the downloaded file.
+        Relationship lines aren't editable yet.
+      </p>
+    </section>
+  );
+}
+
 function StoryMapPage() {
   const { Becoming, CopyButton, useKeptDraft, saveLastMap, Tooltip } = window;
 
@@ -167,6 +431,9 @@ function StoryMapPage() {
   const [scanNames, setScanNames] = React.useState([]);
   const [imagining, setImagining] = React.useState(false);
   const [lastImagine, setLastImagine] = React.useState(null); // for reroll
+  const [view, setView] = React.useState('board'); // board | list
+  const [selectedId, setSelectedId] = React.useState(null); // corkboard selection
+  const [editingChar, setEditingChar] = React.useState(false);
   const fileRef = React.useRef(null);
   const mapFileRef = React.useRef(null);
 
@@ -386,6 +653,18 @@ function StoryMapPage() {
     const names = {};
     cast.forEach((c) => { names[c.id] = c.name; });
 
+    /* The writer's hand: fold an edit into the map itself, keep foundMap in
+       step (so "back to the page" doesn't silently revert their work), and
+       persist — the corkboard re-renders from the same object. */
+    const applyCharEdit = (id, patch) => {
+      const nextChars = cast.map((c, i) => (qsCharId(c, i) === id ? { ...c, ...patch } : c));
+      const next = { ...map, characters: nextChars };
+      setMap(next);
+      if (!next.fabricated && next.story_detected) setFoundMap(next);
+      if (nextChars.length) saveLastMap(next);
+      setEditingChar(false);
+    };
+
     if (!imagined && !map.story_detected) {
       // The honest empty map — and the door out of the dead end.
       return (
@@ -432,13 +711,58 @@ function StoryMapPage() {
         </div>
         {map.note ? <p className="qs-quiethint" style={{ margin: '0 0 var(--space-6) 0' }}>{map.note}</p> : null}
 
-        <div className="qs-board">
-          {cast.map((c, idx) => (
-            <div className="qs-deal" key={c.id || idx} style={{ animationDelay: (idx * 60) + 'ms' }}>
-              <CharacterCard ch={c} names={names} imagined={imagined} />
-            </div>
-          ))}
+        <div className="qs-pills" style={{ marginBottom: 'var(--space-4)' }} aria-label="Map view">
+          <button type="button" className={`qs-pill${view === 'board' ? ' qs-pill--on' : ''}`}
+            onClick={() => setView('board')} aria-pressed={view === 'board'}>Corkboard</button>
+          <button type="button" className={`qs-pill${view === 'list' ? ' qs-pill--on' : ''}`}
+            onClick={() => setView('list')} aria-pressed={view === 'list'}>List</button>
         </div>
+
+        {view === 'board' ? (
+          <>
+            <CorkBoard
+              cast={cast}
+              positions={map.positions || computeCorkLayout(cast)}
+              onChange={(p) => setMap((prev) => ({ ...prev, positions: p }))}
+              onCommit={() => setMap((prev) => { if ((prev.characters || []).length) saveLastMap(prev); return prev; })}
+              selectedId={selectedId}
+              onSelect={(id) => { setEditingChar(false); setSelectedId((cur) => (cur === id ? null : id)); }}
+            />
+            <p className="qs-cork__hint">Drag a card to rearrange — your layout saves with the map. Click a card for the full profile.</p>
+            {(() => {
+              const sel = cast.find((c, i) => qsCharId(c, i) === selectedId);
+              if (!sel) return null;
+              if (editingChar) {
+                return (
+                  <EditCharacterPanel
+                    key={selectedId}
+                    ch={sel}
+                    onSave={(patch) => applyCharEdit(selectedId, patch)}
+                    onCancel={() => setEditingChar(false)}
+                  />
+                );
+              }
+              return (
+                <div style={{ marginTop: 'var(--space-6)' }}>
+                  <CharacterCard ch={sel} names={names} imagined={imagined} />
+                  <div className="qs-actionrow">
+                    <button type="button" className="qs-payoff__again" onClick={() => setEditingChar(true)}>
+                      Edit this character
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        ) : (
+          <div className="qs-board">
+            {cast.map((c, idx) => (
+              <div className="qs-deal" key={c.id || idx} style={{ animationDelay: (idx * 60) + 'ms' }}>
+                <CharacterCard ch={c} names={names} imagined={imagined} />
+              </div>
+            ))}
+          </div>
+        )}
 
         {error ? <p className="qs-note"><QSIcoSmap name="circle-alert" size={16} />{error}</p> : null}
 

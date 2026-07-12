@@ -611,3 +611,54 @@
   font-family: var(--font-body); font-size: var(--fs-small); color: var(--text-faint);
   margin: var(--space-3) 0 0 0; max-width: 54ch; text-wrap: pretty;
 }
+
+/* story map — corkboard view */
+.qs-cork {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--edge-strong); border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  /* break out of the narrow prose column — the board gets the full viewport,
+     capped at its natural 1200px + frame, so it renders near 100% scale on
+     desktop instead of shrunk to fit a text column */
+  left: 50%; translate: -50% 0;
+  width: min(1240px, calc(100vw - 48px));
+}
+.qs-cork__canvas {
+  position: relative; width: 1200px; height: 680px; touch-action: none;
+  background-image: radial-gradient(rgba(237, 228, 211, 0.06) 1.2px, transparent 1.3px);
+  background-size: 18px 18px;
+}
+.qs-cork__svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.qs-pincard {
+  position: absolute; width: 190px; padding: 12px 12px 12px;
+  background: var(--surface-raised); border: 1px solid var(--edge-strong);
+  border-radius: var(--radius-xs); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  cursor: grab; user-select: none; -webkit-user-select: none;
+}
+.qs-pincard:active { cursor: grabbing; }
+.qs-pincard--sel {
+  border-color: var(--ember-400);
+  box-shadow: 0 0 0 1px var(--ember-400), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.qs-pincard__pin {
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  width: 11px; height: 11px; border-radius: 50%; background: #7e2b23;
+  border: 1px solid rgba(0, 0, 0, 0.45); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+.qs-pincard__name {
+  margin: 2px 0 6px; font-family: var(--font-display); font-size: 15px;
+  line-height: 1.2; color: var(--text-body);
+}
+.qs-pincard__meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.qs-pincard__tex {
+  margin: 8px 0 0; font-size: var(--fs-small); font-style: italic; color: var(--text-faint);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.qs-corklabel {
+  font-size: 10px; font-family: var(--font-body); padding: 2px 7px;
+  border-radius: 999px; background: #221b12; border: 1px solid var(--edge-strong);
+  color: var(--text-body); white-space: nowrap;
+}
+.qs-cork__hint {
+  font-size: var(--fs-small); color: var(--text-faint); margin: var(--space-3) 2px 0;
+}

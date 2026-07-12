@@ -93,7 +93,9 @@ function About({ onNavigate }) {
         <span>
           Blurb, Promote, and Story Map run on a free AI tier with a daily
           request cap that resets every 24 hours. If it runs dry, just wait
-          for the reset. Self-hosting your own copy? You can switch{' '}
+          for the reset. Self-hosting{' '}
+          <a className="qs-casting__link" href="https://github.com/viklahan/quietshelf" target="_blank" rel="noreferrer">your own copy</a>?
+          You can switch{' '}
           <code>LLM_PROVIDER</code>{' '}in{' '}<code>.env</code>{' '}to Gemini or a
           local Ollama model instead. Format needs no AI at all and always works.
         </span>
@@ -139,11 +141,14 @@ function About({ onNavigate }) {
 
       <p className="qs-quiethint" style={{ display: 'block', marginTop: 'var(--space-6)' }}>
         Free and open-source. Built to clear the busywork around your book,
-        never to write it for you.
+        never to write it for you. <a className="qs-casting__link" href="https://github.com/viklahan/quietshelf" target="_blank" rel="noreferrer">View the code on GitHub ↗</a>
       </p>
 
       <p className="qs-lead" style={{ marginTop: 'var(--space-10)' }}>Got a suggestion, or found something broken?</p>
       <FeedbackBox />
+      <p className="qs-quiethint" style={{ display: 'block', marginTop: 'var(--space-3)' }}>
+        Or <a className="qs-casting__link" href="https://github.com/viklahan/quietshelf/issues" target="_blank" rel="noreferrer">open an issue on GitHub ↗</a> if you're comfortable there.
+      </p>
     </div>
   );
 }
