@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-brand: #A68E74;
+  --color-brand-hover: #8F785E;
+  --color-paper-bg: #FDFBF7;
+  --color-paper-canvas: #F4F1EA;
+  --color-paper-sidebar: #FAF8F4;
+  --color-paper-border: #E9E2D5;
+  --color-paper-text: #433F38;
+  --color-paper-muted: #8B7E6D;
+  --color-paper-yellow: #FFF9E1;
+  --color-paper-yellow-border: #E6DEC9;
+}
+
+/* Custom scrollbar styling for corkboard */
+.cork-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.cork-scrollbar::-webkit-scrollbar-track {
+  background: #FAF8F4;
+  border-left: 1px solid #E9E2D5;
+}
+.cork-scrollbar::-webkit-scrollbar-thumb {
+  background: #A68E74;
+  border-radius: 5px;
+}
+.cork-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #8F785E;
+}

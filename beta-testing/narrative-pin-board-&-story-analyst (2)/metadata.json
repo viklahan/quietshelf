@@ -1,0 +1,6 @@
+{
+  "name": "Narrative Pin-board & Story Analyst",
+  "description": "An interactive cork-board visual storyboard and narrative character map, featuring character development tracking, emotional sentiment analysis, dialogue coaching, writing team simulation, and downloadable Python code.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
