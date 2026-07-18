@@ -1,67 +1,152 @@
 # Quiet Shelf — STATUS
 
-_Continuity doc. Last updated 2026-07-08. Read this first on any return._
+_Continuity doc. Last updated 2026-07-18. Read this first on any return._
 
-## Where it stands: v1, verified, paused
+## Where it stands: **LIVE IN PRODUCTION**
 
-Four services work, are hardened, and were driven end-to-end on real hardware.
-Work is **paused** here to focus on Pelco Validate (team demo took priority).
-This is a clean stopping point — nothing is half-built.
+**https://quietshelf.studio** — real domain, real HTTPS, real users.
+**Repo:** https://github.com/viklahan/quietshelf (public, MIT)
 
-Branch: `quiet-shelf-restructure`. **Push to a private remote is the one open
-task** (GitHub auth being sorted separately). Everything below is committed.
+Four services work, are hardened, and are running in production. First real
+user (a writer friend) has been testing since 07-12 and reports he'll "use it
+all the time." Work is paused at a clean stopping point.
 
-## The four tabs (all verified live)
+## Production environment
 
-| Tab | What it does | Last verified |
+| | |
+|---|---|
+| Host | Hetzner CPX22 (2 vCPU / 4 GB / 80 GB), Ubuntu 26.04, Falkenstein |
+| IP | 167.233.217.220 |
+| Domain | quietshelf.studio (Porkbun; A records @ and www → the IP) |
+| TLS | Let's Encrypt via certbot --nginx; **expires 2026-10-09**, auto-renews |
+| App | systemd unit `quietshelf.service`, uvicorn on :8000, `Restart=always` |
+| Proxy | nginx → 127.0.0.1:8000 (`/etc/nginx/sites-available/quietshelf`) |
+| Code | `/root/quietshelf` (git clone, **pull-only** — no push creds by design) |
+| Provider | Groq, `llama-3.3-70b-versatile` |
+| Swap | 2 GB swapfile (box shipped with 0) |
+| Firewall | ufw: OpenSSH + Nginx Full |
+
+### Deploying an update
+```bash
+# on Windows: commit + push
+git add -A && git commit -m "..." && git push
+
+# on the server:
+cd /root/quietshelf && git pull && systemctl restart quietshelf
+systemctl status quietshelf --no-pager
+```
+Runbook: `/mnt/user-data/outputs/DEPLOY_Hetzner.md` (from the launch session).
+
+**Two-terminal rule:** `vikra@Legion7 MINGW64` = Windows (git push lives here).
+`root@ubuntu-4gb-fsn1-1` = server (systemctl/nginx/certbot live here). The
+server cannot push to GitHub and doesn't need to.
+
+## The four tabs
+
+| Tab | What it does | State |
 |---|---|---|
-| **Format** | DOCX/RTF/TXT → themed EPUB. **No AI.** | DOCX→EPUB 1.7s, valid EPUB, 4 themes (classic/cozy/modern/children) |
-| **Blurb** | Manuscript → back-cover copy, taglines, keywords | Live on Groq; grounding + kept-draft verified |
-| **Promote** | Writing → stock-footage shot list | Live on Groq, 8 segments; anchor terms + clip memory verified |
-| **Story Map** | Manuscript → character/relationship map (a mirror; opt-in Imagine invents, always stamped) | Full Playwright pass: map, empty-map door, seed + prompts imagine |
+| **Format** | DOCX/RTF/TXT → themed EPUB. **No AI.** Always works even when the AI quota is dry. | Live |
+| **Blurb** | Manuscript → back-cover copy, taglines, keywords | Live |
+| **Promote** | Writing → stock-footage shot list, with orientation filter | Live |
+| **Story Map** | Manuscript → **corkboard** of characters/relationships (a mirror; opt-in Imagine invents, always stamped) | Live |
 
-## What this session built (2026-07-06 → 07-08)
+## Shipped in the launch session (2026-07-11 → 07-12)
 
-- **The map is the pipeline.** Save a Story Map, then ground Blurb and Promote
-  with it (confirmed cast = shared truth). Found maps ground by default;
-  imagined maps opt-in only; the "imagined" stamp travels into prompts and back
-  onto results. Bad map attachment → clean 422, never a silent un-grounded run.
-- **Clip consistency (Promote).** Each character gets a deterministic anchor
-  search term (from their map texture) prepended to every segment they appear
-  in, so the same person keeps the same footage. Found-clip links are kept per
-  character and ride inside the saved map file.
-- **Writer delights.** Pasted drafts persist across refresh (`qs.draft.*`);
-  word-count + read-time meters; outputs already render in serif.
-- **`Start Quiet Shelf.bat`** — one-click launcher for non-technical sharing.
-- **Launch hardening.** 23-case break-it battery (5000-word scripts, 30MB
-  uploads, junk files, malformed JSON, prompt-injection, unicode, access gate).
-  One real bug fixed: corrupt/renamed `.docx` now returns a clean 415, not a 500.
+- **Deployed to Hetzner** end to end: server, DNS, nginx, HTTPS, systemd.
+- **Published to public GitHub.**
+- **Story Map v2 — the corkboard.** Draggable pin-cards, labeled yarn threads
+  (relationship type rendered *on* the line, colored by kind: oxblood =
+  rivalry/betrayal, gold = romance, ember = family), deterministic
+  importance-weighted starting layout, fit-to-width scaling, full-bleed
+  breakout from the prose column.
+- **Character editing.** Click a card → edit name, role, importance,
+  personality, arc, all six texture fields → Save. Writes into the map object,
+  so it updates the board, persists to localStorage, rides inside the
+  downloaded `.json`, **and flows into Blurb/Promote grounding for free.**
+  Layout positions persist the same way once dragged.
+- **About page** — the four tabs, the "your story stays yours / anything added
+  is stamped Imagined" promise, honest free-tier rate-limit note, GitHub links,
+  clickable tab doors.
+- **Private feedback box** — `POST /api/feedback` appends to `feedback.jsonl`
+  on the server (gitignored). No email exposed.
+- **Promote fixes** — orientation filter (Any/Horizontal/Vertical/Square →
+  real Pexels `?orientation=` param, verified against the live site), result
+  now survives refresh, live-busy lines built from the user's own pasted text.
+- **Tooltips** across all four tabs (shared `Tooltip` in `ui.jsx`).
+- **Logo** — V's own quill-and-inkpot art, background keyed to transparency,
+  linework thickened; header, About hero, favicon, README.
+- **requirements.txt regenerated** from the clean server install — two deps
+  (`openai`, `python-multipart`) had been missing for months and only surfaced
+  on the first truly clean install.
 
-Tests: **126 pass.** Providers: **Groq** is the certified demo backend
-(`LLM_PROVIDER=groq`); Gemini is a light-use fallback (free tier = 20 req/day/
-model); Ollama (`qwen2.5:latest`) rehearsed locally at ~126 tok/s on the Legion
-GPU — note the 7B finds fewer characters than Groq's 70B (honest small-model
-tradeoff, not a bug).
+## Frontend architecture — READ BEFORE EDITING
 
-## Known edges (not blocking, not yet fixed)
+- **No build system, no package.json.** `static/*.jsx` is loaded by explicit
+  `<script>` tags in `static/index.html`, compiled by Babel in the browser,
+  wired together via plain `window` globals.
+- **A new file does nothing until you add its `<script>` tag to index.html.**
+- **`frontend/components/*.jsx` is REFERENCE ONLY** — there is no rebuild step,
+  so editing those files has zero effect on the running app.
+- **`static/_ds_bundle.js` is pre-built. Never edit it.**
+- `.qs-note` is a flex row expecting exactly two children (icon + one span).
+  More loose children fragment the layout — wrap text in a single `<span>`.
+- Design tokens in `static/tokens/colors.css`; app background `#15110d`.
 
-- **Imagine overwrites the last saved map.** After a found map, running Imagine
-  replaces `qs.storymap.last` with the imagined one (last-map-wins). Grounding
-  can't lie — imagined defaults OFF downstream — but the user loses found-map
-  default-on grounding until they re-map. Minor polish for later.
+## Known gaps (real, not blocking)
 
-## Next, when Quiet Shelf resumes
+- **Access gate is not wired.** `app/deps.py` checks an `X-Access-Code` header,
+  but `static/api.js` never sends one, and the server `.env` has no
+  `ACCESS_CODE` line — so the check is bypassed entirely. **The site is open**,
+  protected only by the hourly rate limiter and obscurity. Accepted for now.
+  Building the frontend prompt + storage + header is the task before going wide.
+- **No analytics.** Designed but unbuilt: `POST /api/event` appending
+  `{event, tab, duration_seconds, ts}` to `events.jsonl`, frontend timing on
+  tab switch + `navigator.sendBeacon` on close, one honest disclosure line on
+  About. Meanwhile nginx access logs already answer "how many visitors, which
+  endpoints" (`awk '{print $7}' /var/log/nginx/access.log | sort | uniq -c | sort -rn`).
+- **No admin view for feedback.** Read it with
+  `cat /root/quietshelf/feedback.jsonl`. Nothing notifies you. Planned: a
+  `GET /api/feedback` route gated by an `ADMIN_CODE` in `.env` (404s when
+  unset, so self-hosters never expose a door they didn't configure).
+- **Format:** an uploaded file does not survive a page refresh.
+- **Blurb:** the generated result does not survive refresh (Promote and Story
+  Map now do).
+- **EPUB cover in external readers** — unresolved. The in-app "It's a book now"
+  mockup now shows the real uploaded cover or real theme palette, but an
+  external reader showed no cover. Suspected Pandoc EPUB2-vs-EPUB3 cover
+  convention gap. **To diagnose: open an actual generated `.epub` (it's a zip)
+  and read the OPF manifest.**
+- **Imagine overwrites the last saved map** (last-map-wins). Grounding can't
+  lie — imagined defaults OFF downstream — but found-map default-on grounding
+  is lost until re-mapped.
+- Service runs as **root**; a dedicated non-root user is better practice.
+- **Stale branding:** LICENSE and SKILL.md still say "Quiet Fight Club."
+- **epubcheck deliberately not used** — the PyPI package wraps a Java tool, and
+  nothing else in this stack needs a JVM. Current lightweight zip/mimetype/
+  container/OPF check is sufficient. Optional-if-Java-detected is the banked
+  middle path if this ever targets KDP-grade validation.
 
-1. **Push to a private remote** (only open launch task).
-2. **Corkboard visual for Story Map.** Original scope said "React Flow
-   corkboard"; shipped a card board. Plan: an **SVG string overlay** drawing
-   relationship curves between the existing cards (the data is already there:
-   `character.relationships[].with`) — augment the cards, don't rebuild them.
-3. **Friend access:** set `ACCESS_CODE` in `.env`, hand the friend the code.
-4. Optional: hosting via a tunnel (Cloudflare Tunnel is the recommendation) with
-   the Jetson as backend.
+## Banked ideas (designed, not committed to)
 
-## How to run
+- **Draw-your-own threads + add-your-own sticky notes** — completes "the
+  writer's hands" phase started by character editing.
+- **The 3,000-word ceiling** is the biggest real limitation (a novel is 80k).
+  Chunked extraction with character-merging across chunks is the hard,
+  high-value problem.
+- **Self-contained HTML export** — one file, board data baked in, opens in any
+  browser forever. (Gemini's prototype did this as a Python/Tkinter export;
+  HTML is the better version — same durability promise, no Python prerequisite.)
+- **Image / storyboard cards** on the board.
+- **Honest continuity checker** — the one genuinely good idea in the Gemini
+  prototype, rebuilt on this project's grounding discipline: facts as verbatim
+  quotes with positions in the real text, verified — never invented scores.
+- **A second app on the same Hetzner box** — technically straightforward: own
+  port, own systemd unit, nginx routes by domain, own certbot cert. This is
+  also the point where Coolify becomes worth reconsidering (it was correctly
+  skipped for a single app). Multiple projects on one box is the argument for
+  keeping CPX22 rather than resizing down.
+
+## How to run locally
 
 - **Simplest:** double-click `Start Quiet Shelf.bat` (Windows) → localhost:8090.
 - **Docker:** `docker compose up --build` → localhost:8000.
