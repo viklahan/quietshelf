@@ -334,7 +334,7 @@ function Promote() {
       <QSScriptTA
         value={text}
         onChange={setText}
-        placeholder="Paste your writing here\u2026"
+        placeholder="Paste your writing here…"
         minHeight={260}
         ariaLabel="Your writing"
       />
