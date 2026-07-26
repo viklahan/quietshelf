@@ -11,11 +11,20 @@ DEFAULT_PROVIDER = "gemini"
 DEFAULT_WATERFALL_ORDER = ["gemini", "groq", "cerebras"]
 DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
-    "groq": "llama-3.3-70b-versatile",
-    "cerebras": "llama-3.3-70b",
+    "groq": "openai/gpt-oss-120b",
+    "cerebras": "gpt-oss-120b",
     "ollama": "qwen2.5:latest",
     "openrouter": "openai/gpt-oss-20b:free",
 }
+# Groq free model fallback list — tried in order when the primary 404s.
+# Groq deprecates models without much notice (llama-3.3-70b-versatile went
+# June 17 2026); this list self-heals instead of failing hard.
+DEFAULT_GROQ_FALLBACKS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.6-27b",
+    "moonshotai/kimi-k2-instruct-0905",
+]
 # OpenRouter free model slugs get retired without notice. If the configured
 # model 404s ("unavailable for free"), the provider walks this list so the app
 # self-heals instead of failing. All must support JSON (response_format).
@@ -67,6 +76,15 @@ def openrouter_fallback_models() -> list[str]:
     if raw:
         return [m.strip() for m in raw.split(",") if m.strip()]
     return list(DEFAULT_OPENROUTER_FALLBACKS)
+
+
+def groq_fallback_models() -> list[str]:
+    """Models to try (in order) when the configured Groq model is gone.
+    Override with a comma-separated GROQ_FALLBACK_MODELS."""
+    raw = os.getenv("GROQ_FALLBACK_MODELS", "").strip()
+    if raw:
+        return [m.strip() for m in raw.split(",") if m.strip()]
+    return list(DEFAULT_GROQ_FALLBACKS)
 
 
 def gemini_api_key() -> str:

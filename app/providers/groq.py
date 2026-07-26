@@ -1,5 +1,12 @@
-"""Groq free tier via the groq SDK - open models (Llama 3.x) at high speed."""
+"""Groq free tier via the groq SDK - open models at high speed.
+
+Groq deprecates models without notice (llama-3.3-70b-versatile went June 17
+2026). We walk DEFAULT_GROQ_FALLBACKS when the configured model 404s so the
+app self-heals instead of failing hard on a silent catalog change.
+"""
 from __future__ import annotations
+
+import logging
 
 import groq as groq_sdk
 
@@ -12,6 +19,8 @@ from app.providers.base import (
     ProviderTimeout,
 )
 from app.providers.pacing import acquire_slot
+
+logger = logging.getLogger("quietshelf.groq")
 
 
 class GroqProvider(Provider):
@@ -34,22 +43,39 @@ class GroqProvider(Provider):
             timeout=config.LLM_TIMEOUT_SECONDS,
             max_retries=0,
         )
-        kwargs = {
-            "model": config.model_name(),
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-        }
-        if json_mode:
-            # JSON mode requires the word "JSON" in the prompt; system prompts do.
-            kwargs["response_format"] = {"type": "json_object"}
-        try:
-            response = client.chat.completions.create(**kwargs)
-        except groq_sdk.RateLimitError as exc:
-            raise ProviderRateLimited(str(exc)) from exc
-        except groq_sdk.APITimeoutError as exc:
-            raise ProviderTimeout(str(exc)) from exc
-        except groq_sdk.APIError as exc:
-            raise ProviderError(f"Groq API error: {type(exc).__name__}") from exc
-        return response.choices[0].message.content or ""
+
+        primary = config.model_name()
+        fallbacks = config.groq_fallback_models()
+        # Start with the configured model, then try fallbacks if it's gone
+        models_to_try = [primary] + [m for m in fallbacks if m != primary]
+
+        last_exc: Exception | None = None
+        for model in models_to_try:
+            kwargs: dict = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            try:
+                response = client.chat.completions.create(**kwargs)
+                if model != primary:
+                    logger.warning("groq: fell through to fallback model=%s", model)
+                return response.choices[0].message.content or ""
+            except groq_sdk.RateLimitError as exc:
+                raise ProviderRateLimited(str(exc)) from exc
+            except groq_sdk.APITimeoutError as exc:
+                raise ProviderTimeout(str(exc)) from exc
+            except groq_sdk.NotFoundError as exc:
+                logger.warning("groq: model %s not found, trying next", model)
+                last_exc = exc
+                continue
+            except groq_sdk.APIError as exc:
+                raise ProviderError(f"Groq API error: {type(exc).__name__}") from exc
+
+        raise ProviderError(
+            f"No working Groq model found. Tried: {models_to_try}. Last: {last_exc}"
+        )
