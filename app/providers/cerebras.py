@@ -16,7 +16,7 @@ from app.providers.base import (
 from app.providers.pacing import acquire_slot
 
 logger = logging.getLogger("quietshelf.cerebras")
-DEFAULT_CEREBRAS_MODELS = ["llama-3.3-70b", "llama3.1-70b", "qwen3-32b"]
+DEFAULT_CEREBRAS_MODELS = ["gpt-oss-120b", "gemma-4-31b", "zai-glm-4.7"]
 
 
 class CerebrasProvider(Provider):
