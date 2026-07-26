@@ -52,6 +52,10 @@ async def format_manuscript(
     author: str = Form(...),
     theme: Theme = Form(...),
     cover_image: UploadFile | None = File(None),
+    # Generated-cover look; plain strings on purpose - unknown values fall
+    # back to quiet + ink inside cover.py, never a 422.
+    cover_style: str | None = Form(None),
+    cover_accent: str | None = Form(None),
     _: None = Depends(guard),
 ):
     get_theme(theme)  # validates enum membership
@@ -76,6 +80,7 @@ async def format_manuscript(
         convert_to_epub(
             source=src, out_path=out, title=title, author=author,
             theme=theme, cover_image=cover_bytes,
+            cover_style=cover_style, cover_accent=cover_accent,
         )
     except UnsupportedFormat as exc:
         _cleanup(workdir)

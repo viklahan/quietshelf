@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 import shutil
 import tempfile
 import uuid
@@ -47,18 +48,127 @@ def _copyright_html(author: str, year: int) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Chapter heading normaliser
+# ---------------------------------------------------------------------------
+# Writers produce chapter headings in many forms.  Pandoc splits EPUB files
+# at H1 boundaries (--split-level=1), so anything that doesn't arrive as a
+# markdown H1 ends up in the previous chapter's XHTML file, causing the
+# "chapter starts mid-page" bug.
+#
+# Patterns we recognise and promote to `# …`:
+#   CHAPTER ONE / CHAPTER 1 / CHAPTER I  (all-caps or title-case, optional colon)
+#   Chapter One / chapter one
+#   Ch. 7 / CH 7
+#   Part I / PART TWO
+#   Prologue / Epilogue / Introduction / Preface (standalone)
+#   ## already-an-h2 heading  (demoted to H1 so split-level=1 catches it)
+#   Any standalone line ≤ 60 chars followed by a blank line and ≥ 50 words
+#   of prose (heuristic: looks like an untitled chapter break)
+#
+# Only plain-text / markdown paths are normalised; DOCX headings are already
+# semantic and Pandoc reads them correctly via its native DOCX reader.
+
+_CHAPTER_RE = re.compile(
+    r'''
+    ^
+    (?:
+        # explicit chapter/part keywords
+        (?:chapter|ch\.?|part)\s+
+        (?:[IVXLCDM]+|\d+|[a-z]+)
+        (?:[:\s].*)?
+      |
+        # standalone structural words
+        (?:prologue|epilogue|introduction|preface|afterword
+           |interlude|coda|foreword|acknowledgements?|dedication)
+        (?:[:\s].*)?
+    )
+    $
+    ''',
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _normalise_chapters(text: str) -> str:
+    """Promote chapter headings to markdown H1 so Pandoc splits on them.
+
+    Patterns handled:
+    - CHAPTER ONE / Chapter 7 / chapter i / Ch. 3 (with optional subtitle)
+    - Part I / PART TWO
+    - Prologue / Epilogue / Introduction / Preface / Afterword etc.
+    - ## H2 or ### H3 headings promoted to H1
+    - Existing # H1 headings passed through unchanged
+
+    Each detected heading gets a blank line before and after so Pandoc
+    never runs heading text into adjacent prose. Consecutive blank lines
+    are collapsed to one.
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+
+    def ensure_blank_before() -> None:
+        if out and out[-1] != '':
+            out.append('')
+
+    for raw in lines:
+        stripped = raw.strip()
+
+        # Already H1 — keep exactly, but ensure blank lines around it
+        if re.match(r'^#\s+', stripped):
+            ensure_blank_before()
+            out.append(stripped)
+            out.append('')
+            continue
+
+        # H2 / H3 — extract the heading text, promote to H1
+        m = re.match(r'^#{2,3}\s+(.+)', stripped)
+        if m:
+            ensure_blank_before()
+            out.append(f'# {m.group(1).strip()}')
+            out.append('')
+            continue
+
+        # Plain-text chapter heading
+        if _CHAPTER_RE.match(stripped):
+            ensure_blank_before()
+            out.append(f'# {stripped}')
+            out.append('')
+            continue
+
+        # Blank line — collapse consecutive blanks to one
+        if stripped == '':
+            if out and out[-1] != '':
+                out.append('')
+            continue
+
+        out.append(raw)
+
+    while out and out[-1] == '':
+        out.pop()
+    return '\n'.join(out) + '\n'
+
+
 def _prepare_input(source: Path, workdir: Path) -> tuple[Path, str]:
-    """Return (input_path, pandoc_format) for the source file."""
+    """Return (input_path, pandoc_format) for the source file.
+
+    TXT and RTF inputs pass through _normalise_chapters first so that
+    common chapter heading patterns become proper H1s before Pandoc sees
+    the file.  DOCX is left untouched — Pandoc reads its heading styles
+    natively and already handles split-level=1 correctly.
+    """
     ext = source.suffix.lower()
     if ext == ".docx":
         return source, "docx"
     if ext == ".txt":
-        return source, "markdown"
+        raw = source.read_text(encoding="utf-8", errors="ignore")
+        normalised = workdir / "normalised.md"
+        normalised.write_text(_normalise_chapters(raw), encoding="utf-8")
+        return normalised, "markdown"
     if ext == ".rtf":
         text = rtf_to_text(source.read_text(encoding="utf-8", errors="ignore"))
-        md = workdir / "from_rtf.md"
-        md.write_text(text, encoding="utf-8")
-        return md, "markdown"
+        normalised = workdir / "from_rtf.md"
+        normalised.write_text(_normalise_chapters(text), encoding="utf-8")
+        return normalised, "markdown"
     raise UnsupportedFormat(
         f"Unsupported file type '{ext}'. Please upload a DOCX, RTF, or TXT file."
     )
@@ -101,6 +211,8 @@ def convert_to_epub(
     author: str,
     theme: Theme,
     cover_image: bytes | None = None,
+    cover_style: str | None = None,
+    cover_accent: str | None = None,
 ) -> Path:
     """Convert a manuscript to a themed, validated EPUB at out_path."""
     if source.suffix.lower() not in SUPPORTED:
@@ -115,7 +227,11 @@ def convert_to_epub(
 
         # Cover: supplied bytes, else generated typographic PNG.
         cover_path = workdir / "cover.png"
-        cover_path.write_bytes(cover_image if cover_image else generate_cover(title, author, theme))
+        cover_path.write_bytes(
+            cover_image
+            if cover_image
+            else generate_cover(title, author, theme, style=cover_style, accent=cover_accent)
+        )
 
         # Metadata YAML for pandoc.
         meta = workdir / "meta.yaml"

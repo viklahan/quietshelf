@@ -114,3 +114,99 @@ def test_blurb_endpoint_with_pasted_text(client, monkeypatch):
 def test_blurb_endpoint_rejects_too_short(client):
     response = client.post("/api/blurb", data={"text": "too short"})
     assert response.status_code == 422
+
+
+def test_length_enum_includes_full():
+    from app.services.blurb.models import Length
+    assert Length("full") == Length.full
+
+
+def test_blurb_result_backfills_back_cover_from_variants():
+    from app.services.blurb.models import BlurbResult
+
+    r = BlurbResult(
+        back_cover_variants=["Character-led take.", "Mood-led take."],
+        taglines=["One.", "Two.", "Three."],
+        short_description="Short.",
+        keywords=["fiction"],
+    )
+    assert r.back_cover == "Character-led take."
+
+
+def test_blurb_result_old_shape_still_valid():
+    from app.services.blurb.models import BlurbResult
+
+    r = BlurbResult(
+        back_cover="Just the one take.",
+        taglines=["One.", "Two.", "Three."],
+        short_description="Short.",
+        keywords=["fiction"],
+    )
+    assert r.back_cover == "Just the one take."
+    assert r.back_cover_variants == []
+    assert r.query_paragraph is None
+    assert r.comps == []
+
+
+def test_blurb_result_requires_some_back_cover():
+    from app.services.blurb.models import BlurbResult
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        BlurbResult(
+            taglines=["One.", "Two.", "Three."],
+            short_description="Short.",
+            keywords=["fiction"],
+        )
+
+
+def test_generate_blurb_full_length_and_rich_prompt(monkeypatch):
+    from app.services.blurb import generator
+    from app.services.blurb.models import BlurbResult, Tone, Length
+
+    fake = BlurbResult(
+        back_cover_variants=["A.", "B."],
+        taglines=["One.", "Two.", "Three."],
+        short_description="Short.",
+        keywords=["fiction"],
+    )
+    captured = {}
+
+    def fake_generate_json(system, user, model):
+        captured["system"] = system
+        return fake
+
+    monkeypatch.setattr(generator, "generate_json", fake_generate_json)
+    generator.generate_blurb("Some manuscript text.", tone=Tone.warm, length=Length.full)
+    system = captured["system"]
+    assert "full" in system.lower()
+    assert "back_cover_variants" in system
+    assert "query_paragraph" in system
+    assert "comps" in system
+
+
+def test_blurb_endpoint_returns_rich_fields(client, monkeypatch):
+    from app.services.blurb import router as blurb_router_mod
+    from app.services.blurb.models import BlurbResult
+
+    fake = BlurbResult(
+        back_cover_variants=["Character-led.", "Mood-led.", "Hook-led."],
+        taglines=["One.", "Two.", "Three."],
+        short_description="Short description here.",
+        keywords=["literary fiction"],
+        query_paragraph="Dear Agent, THE LONG ROAD (82,000 words) ...",
+        comps=["The Dutch House — Ann Patchett", "Commonwealth — Ann Patchett"],
+    )
+    monkeypatch.setattr(blurb_router_mod, "generate_blurb", lambda *a, **k: fake)
+
+    response = client.post(
+        "/api/blurb",
+        data={"text": "word " * 80, "tone": "warm", "length": "full"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["back_cover"] == "Character-led."          # backfilled for old clients
+    assert len(body["back_cover_variants"]) == 3
+    assert body["query_paragraph"].startswith("Dear Agent")
+    assert len(body["comps"]) == 2

@@ -303,7 +303,7 @@ def test_map_endpoint_near_empty_input_rejected(client):
 
 
 def test_map_endpoint_too_long_rejected(client):
-    response = client.post("/api/storymap/map", data={"text": "word " * 3001})
+    response = client.post("/api/storymap/map", data={"text": "word " * 5001})
     assert response.status_code == 422
     assert "3,000" in response.json()["detail"]
 
@@ -408,7 +408,7 @@ def test_imagine_endpoint_allows_short_input(client, monkeypatch):
 
 
 def test_imagine_endpoint_too_long_rejected(client):
-    response = client.post("/api/storymap/imagine", data={"text": "word " * 3001, "mode": "full"})
+    response = client.post("/api/storymap/imagine", data={"text": "word " * 5001, "mode": "full"})
     assert response.status_code == 422
     assert "3,000" in response.json()["detail"]
 

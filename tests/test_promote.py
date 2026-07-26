@@ -139,6 +139,6 @@ def test_short_script_rejected(client):
 
 
 def test_long_script_rejected(client):
-    response = client.post("/api/promote", json={"script": "word " * 3001})
+    response = client.post("/api/promote", json={"script": "word " * 5001})
     assert response.status_code == 422
     assert "too long" in response.json()["detail"].lower()

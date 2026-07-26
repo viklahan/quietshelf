@@ -18,13 +18,27 @@ not present. If the excerpt is thin, stay evocative and general rather than
 fabricating specifics.
 
 Desired tone of the copy: {tone}.
-Desired length of the back-cover copy: {length} (short ~80 words, medium ~130 words).
+Desired length of the back-cover copy: {length} (short ~80 words, medium ~130
+words, full ~200 words).
+
+The writer supplied ~{word_count} words of text. This may be an excerpt, not
+the whole manuscript - never state it as the book's word count.
 
 Produce a JSON object with exactly these fields:
-- "back_cover": back-cover copy (~100-150 words for medium, ~80 for short)
+- "back_cover_variants": an array of 2-3 genuinely distinct takes on the
+  back-cover copy, all in the desired tone and length. Each take must come at
+  the book from a different angle (e.g. character-led / mood-led / hook-led) -
+  not paraphrases of each other.
 - "taglines": an array of exactly 3 short, punchy taglines
 - "short_description": a ~50-word store-listing description
 - "keywords": an array of genre/category/keyword suggestions for store listings
+- "query_paragraph": ONE paragraph for a query letter to a literary agent:
+  the title if the text gives one, the hook, and the comp titles. Only state a
+  word count if the writer's text states one - never invent numbers.
+- "comps": an array of 2-3 comparable published titles, each as a single
+  string formatted "Title - Author". Use real, well-known published books that
+  genuinely match the genre and mood on the page; if you cannot name real
+  comps confidently, give fewer rather than inventing any.
 
 Respond with ONLY the JSON object. No markdown fences, no commentary.
 """
@@ -48,7 +62,9 @@ def generate_blurb(
     length: Length = Length.medium,
     cast_context: str = "",
 ) -> BlurbResult:
-    system = _SYSTEM.format(tone=tone.value, length=length.value)
+    system = _SYSTEM.format(
+        tone=tone.value, length=length.value, word_count=len(text.split())
+    )
     if cast_context:
         system += _CAST_ADDENDUM.format(cast=cast_context)
     user = sample_text(text)
