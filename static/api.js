@@ -28,6 +28,26 @@
     return err;
   }
 
+  // POST /api/format/cover-suggestions -> { suggestions: [{url, thumb_url, photographer, source, search_term}] }
+  async function getCoverSuggestions({ title, passage, n = 3 }) {
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('passage', passage || '');
+    fd.append('n', String(n));
+    const resp = await fetch(BASE + '/api/format/cover-suggestions', { method: 'POST', body: fd });
+    if (!resp.ok) throw await friendlyError(resp, 'Could not fetch cover suggestions.');
+    return await resp.json();
+  }
+
+  // POST /api/format/fetch-cover-image -> raw image bytes as a Blob
+  async function fetchCoverImage(url) {
+    const fd = new FormData();
+    fd.append('url', url);
+    const resp = await fetch(BASE + '/api/format/fetch-cover-image', { method: 'POST', body: fd });
+    if (!resp.ok) throw await friendlyError(resp, 'Could not download that image.');
+    return await resp.blob();
+  }
+
   // GET /api/format/themes -> [{ id, display_name, description }]
   async function fetchThemes() {
     const resp = await fetch(BASE + '/api/format/themes');
@@ -206,6 +226,7 @@
 
   window.QS_API = {
     fetchThemes, formatBook, generateBlurb, promote, promoteStream,
+    getCoverSuggestions, fetchCoverImage,
     storymapScan, storymapMap, storymapImagine,
     health, sendFeedback, calmDelay,
   };

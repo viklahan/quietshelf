@@ -17,6 +17,7 @@ from app.services.format.converter import (
     UnsupportedFormat,
     convert_to_epub,
 )
+from app.services.format.cover_suggestions import get_cover_suggestions
 from app.services.format.models import Theme, ThemeInfo, ThemeList
 from app.services.format.themes import THEMES, get_theme
 
@@ -33,6 +34,63 @@ def list_themes() -> ThemeList:
             for spec in THEMES.values()
         ]
     )
+
+
+@router.post("/cover-suggestions")
+async def cover_suggestions(
+    title: str = Form(...),
+    passage: str = Form(""),
+    n: int = Form(3),
+    _: None = Depends(guard),
+):
+    """Extract visual themes from the story and return n photo candidates
+    from the image waterfall (Unsplash → Pexels → Pixabay). The writer
+    picks one; the chosen photo URL is then passed back in the format call.
+    Returns an empty list when no image APIs are configured — never 500.
+    """
+    n = max(1, min(5, n))
+    suggestions = get_cover_suggestions(title=title, passage=passage, n=n)
+    return {"suggestions": suggestions}
+
+
+@router.post("/fetch-cover-image")
+async def fetch_cover_image(
+    url: str = Form(...),
+    _: None = Depends(guard),
+):
+    """Download a chosen photo from a trusted image host and return it as
+    bytes so the EPUB compiler can embed it without CORS issues.
+    Only Unsplash, Pexels, and Pixabay domains are accepted.
+    """
+    import httpx
+    from fastapi.responses import Response
+
+    _ALLOWED_HOSTS = (
+        "images.unsplash.com",
+        "plus.unsplash.com",
+        "images.pexels.com",
+        "cdn.pixabay.com",
+        "pixabay.com",
+    )
+    from urllib.parse import urlparse
+    host = urlparse(url).netloc
+    if not any(host == h or host.endswith("." + h) for h in _ALLOWED_HOSTS):
+        raise HTTPException(status_code=422, detail="Image URL is not from a trusted source.")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.get(url)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Could not fetch the image.")
+        ct = resp.headers.get("content-type", "image/jpeg")
+        return Response(content=resp.content, media_type=ct)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Image fetch timed out.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("cover_image_fetch_failed url=%s", url[:80])
+        raise HTTPException(status_code=502, detail="Could not fetch the image.")
 
 
 def _safe_stem(title: str) -> str:

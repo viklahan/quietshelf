@@ -1,22 +1,18 @@
 /* Quiet Shelf — Format. The hero. compose -> becoming -> the book on the shelf.
-   Wired to POST /api/format (multipart) and GET /api/format/themes. */
+   Wired to POST /api/format (multipart) and GET /api/format/themes.
+   Cover suggestions: AI extracts themes → waterfall sources photos from
+   Unsplash/Pexels/Pixabay → writer picks one or uploads their own. */
 const QSDS_fmt = window.QuietFightClubDesignSystem_fae847;
 const { Button: QSButton, Icon: QSIcon } = QSDS_fmt;
 
 const QS_ALLOWED = ['docx', 'rtf', 'txt'];
 
-/* Keep file inputs in the render tree (not display:none) so a programmatic
-   .click() reliably opens the OS picker in every browser — display:none
-   inputs silently fail to open in Firefox/Safari. */
 const QS_HIDDEN_INPUT = {
   position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
   overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap',
   border: 0, opacity: 0,
 };
 
-/* Typeset previews are presentation-only: they show how each theme *feels*.
-   Real display names + descriptions come from the backend; we key the sample
-   text and CSS face by the theme id the API returns. */
 const QS_THEME_PREVIEWS = {
   classic: {
     face: 'classic',
@@ -32,11 +28,10 @@ const QS_THEME_PREVIEWS = {
   },
   children: {
     face: 'children',
-    sample: 'And the little boat went out, and out, and out — until the harbour was just a freckle of gold.',
+    sample: 'And the little boat went out, and out, and out \u2014 until the harbour was just a freckle of gold.',
   },
 };
 
-/* If the themes call ever fails, the screen still works with these. */
 const QS_THEME_FALLBACK = [
   { id: 'classic', name: 'Classic Literary', note: 'Old-style serif, a drop cap, justified pages.' },
   { id: 'cozy', name: 'Cozy', note: 'Warm, roomy leading. A fireside read.' },
@@ -76,9 +71,6 @@ function ThemeCard({ theme, selected, onSelect }) {
   );
 }
 
-/* Mirrors cover.py's own _PALETTE exactly, so when no cover is uploaded the
-   payoff screen's colors match the REAL generated cover, not a generic dark
-   mockup. Keep this in sync if cover.py's palette ever changes. */
 const QS_COVER_PALETTE = {
   classic: { bg: '#f4f0e8', ink: '#28221c' },
   cozy: { bg: '#f7f1ee', ink: '#3c2e2e' },
@@ -86,10 +78,61 @@ const QS_COVER_PALETTE = {
   children: { bg: '#fff8e6', ink: '#2c3e50' },
 };
 
+/* Photo suggestion card — atmospheric thumbnail the writer can pick */
+function PhotoCard({ photo, selected, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(selected ? null : photo)}
+      aria-pressed={selected}
+      style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '2/3',
+        borderRadius: 'var(--radius-xs)',
+        overflow: 'hidden',
+        border: selected ? '2px solid var(--ember-400)' : '2px solid transparent',
+        cursor: 'pointer',
+        background: 'var(--surface-raised)',
+        transition: 'border-color 0.15s',
+        padding: 0,
+      }}
+    >
+      <img
+        src={photo.thumb_url}
+        alt={photo.search_term}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      />
+      {selected && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(197,137,59,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <QSIcon name="circle-check" size={32} style={{ color: 'var(--ember-400)' }} />
+        </div>
+      )}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+        padding: '8px 6px 4px',
+      }}>
+        <p style={{
+          margin: 0, fontSize: '10px', color: 'rgba(255,255,255,0.7)',
+          fontFamily: 'var(--font-body)', lineHeight: 1.2,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {photo.photographer} \u00b7 {photo.source}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 function Format() {
   const { Shelf, FinishedBook, Becoming, StepLabel, Tooltip } = window;
 
-  const [phase, setPhase] = React.useState('compose'); // compose | becoming | done
+  const [phase, setPhase] = React.useState('compose');
   const [storyFile, setStoryFile] = React.useState(null);
   const [coverFile, setCoverFile] = React.useState(null);
   const [title, setTitle] = React.useState('');
@@ -97,13 +140,14 @@ function Format() {
   const [theme, setTheme] = React.useState('classic');
   const [error, setError] = React.useState('');
   const [themes, setThemes] = React.useState(QS_THEME_FALLBACK);
-  const [result, setResult] = React.useState(null); // { blob, filename }
+  const [result, setResult] = React.useState(null);
+  const [suggestions, setSuggestions] = React.useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
+  const [chosenPhoto, setChosenPhoto] = React.useState(null);
 
   const fileRef = React.useRef(null);
   const coverRef = React.useRef(null);
 
-  // A real preview of the uploaded cover, lifecycle-managed: created once per
-  // coverFile change, revoked on change/unmount so we never leak blob URLs.
   const [coverPreviewUrl, setCoverPreviewUrl] = React.useState(null);
   React.useEffect(() => {
     if (!coverFile) { setCoverPreviewUrl(null); return undefined; }
@@ -112,6 +156,12 @@ function Format() {
     return () => URL.revokeObjectURL(url);
   }, [coverFile]);
 
+  // Also generate a preview URL for the chosen stock photo
+  const [photoPreviewUrl, setPhotoPreviewUrl] = React.useState(null);
+  React.useEffect(() => {
+    setPhotoPreviewUrl(chosenPhoto ? chosenPhoto.thumb_url : null);
+  }, [chosenPhoto]);
+
   React.useEffect(() => {
     let alive = true;
     window.QS_API.fetchThemes()
@@ -119,7 +169,7 @@ function Format() {
         if (!alive || !list.length) return;
         setThemes(list.map((t) => ({ id: t.id, name: t.display_name, note: t.description })));
       })
-      .catch(() => { /* keep the fallback themes */ });
+      .catch(() => {});
     return () => { alive = false; };
   }, []);
 
@@ -131,6 +181,8 @@ function Format() {
     }
     setError('');
     setStoryFile(file);
+    setSuggestions([]);
+    setChosenPhoto(null);
     if (!title) setTitle(stemFromFileName(file.name));
   }
 
@@ -140,37 +192,66 @@ function Format() {
   }
   function onPickCover(e) {
     const f = e.target.files && e.target.files[0];
-    if (f) setCoverFile(f);
+    if (f) { setCoverFile(f); setChosenPhoto(null); }
+  }
+
+  async function loadSuggestions() {
+    if (!storyFile || suggestionsLoading) return;
+    setSuggestionsLoading(true);
+    setSuggestions([]);
+    setChosenPhoto(null);
+    try {
+      const text = await storyFile.text().catch(() => '');
+      const passage = text.split(/\s+/).slice(0, 600).join(' ');
+      const data = await window.QS_API.getCoverSuggestions({
+        title: title || storyFile.name,
+        passage,
+        n: 3,
+      });
+      setSuggestions(data.suggestions || []);
+    } catch (e) {
+      // Suggestions are optional \u2014 silently fail, writer can still upload their own
+    } finally {
+      setSuggestionsLoading(false);
+    }
   }
 
   async function begin() {
-    if (!storyFile) { setError('Bring me your story first — then we’ll begin.'); return; }
+    if (!storyFile) { setError('Bring me your story first \u2014 then we\u2019ll begin.'); return; }
     setError('');
     setResult(null);
     setPhase('becoming');
     try {
+      // Priority: uploaded cover file > chosen stock photo > typographic generated cover
+      let coverToSend = coverFile;
+      if (!coverToSend && chosenPhoto) {
+        const blob = await window.QS_API.fetchCoverImage(chosenPhoto.url);
+        coverToSend = new File([blob], 'cover.jpg', { type: blob.type || 'image/jpeg' });
+      }
       const [out] = await Promise.all([
         window.QS_API.formatBook({
           file: storyFile,
           title: title || stemFromFileName(storyFile.name),
           author: author || 'Unknown Author',
           theme: theme,
-          cover: coverFile,
+          cover: coverToSend,
         }),
         window.QS_API.calmDelay(1600),
       ]);
       setResult(out);
       setPhase('done');
     } catch (err) {
-      setError(err.message || 'Something went wrong. Try again.');
+      const msg = (err && typeof err.message === 'string') ? err.message : 'Something went wrong. Try again.';
+      setError(msg);
       setPhase('compose');
     }
   }
 
   function reset() {
     setPhase('compose');
-    setStoryFile(null); setCoverFile(null);
-    setTitle(''); setAuthor(''); setTheme('classic'); setError(''); setResult(null);
+    setStoryFile(null); setCoverFile(null); setChosenPhoto(null);
+    setTitle(''); setAuthor(''); setTheme('classic'); setError('');
+    setResult(null); setSuggestions([]);
   }
 
   function download() {
@@ -188,10 +269,10 @@ function Format() {
       <div className="qs-page qs-page--narrow">
         <Becoming
           lines={[
-            'Reading your story…',
-            'Setting your words…',
-            'Binding the pages…',
-            'Almost bound…',
+            'Reading your story\u2026',
+            'Setting your words\u2026',
+            'Binding the pages\u2026',
+            'Almost bound\u2026',
           ]}
           sub="This takes a moment. Stay a while."
           duration={4200}
@@ -202,16 +283,17 @@ function Format() {
   }
 
   if (phase === 'done') {
+    const displayCover = coverPreviewUrl || photoPreviewUrl;
     return (
       <div className="qs-page qs-page--narrow qs-payoff">
-        <p className="qs-payoff__title">It’s a book now.</p>
-        <p className="qs-payoff__sub">Your story, on the shelf — real.</p>
+        <p className="qs-payoff__title">It\u2019s a book now.</p>
+        <p className="qs-payoff__sub">Your story, on the shelf \u2014 real.</p>
         <div className="qs-shelfwrap qs-shelfwrap--lg">
           <Shelf lit={true}>
             <FinishedBook
               title={title || 'Your book'}
               author={author || ' '}
-              coverUrl={coverPreviewUrl}
+              coverUrl={displayCover}
               bg={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).bg}
               ink={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).ink}
             />
@@ -229,12 +311,13 @@ function Format() {
 
   const storyName = storyFile ? storyFile.name : '';
   const coverName = coverFile ? coverFile.name : '';
+  const hasCover = !!(coverFile || chosenPhoto);
 
   return (
     <div className="qs-page qs-page--narrow">
       <p className="qs-lead">Turn your manuscript into a beautiful book. One calm step at a time.</p>
 
-      {/* 1 — Bring your story */}
+      {/* 1 \u2014 Bring your story */}
       <div className="qs-step">
         <StepLabel n="1">Bring your story</StepLabel>
         <input
@@ -261,7 +344,7 @@ function Format() {
         {error ? <p className="qs-note"><QSIcon name="circle-alert" size={16} /><span>{String(error)}</span></p> : null}
       </div>
 
-      {/* 2 — Title & author */}
+      {/* 2 \u2014 Title & author */}
       <div className="qs-step">
         <StepLabel n="2">Title &amp; author</StepLabel>
         <div className="qs-fields qs-fields--two">
@@ -278,7 +361,7 @@ function Format() {
         </div>
       </div>
 
-      {/* 3 — Choose a feeling */}
+      {/* 3 \u2014 Choose a feeling */}
       <div className="qs-step">
         <StepLabel n="3">Choose a feeling</StepLabel>
         <div className="qs-themes">
@@ -288,29 +371,98 @@ function Format() {
         </div>
       </div>
 
-      {/* 4 — Cover (optional) */}
-      <div className="qs-step">
-        <StepLabel n="4">Cover <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>— optional</span>{' '}
-          <Tooltip text="JPG or PNG work best. No cover? I'll make a simple one for you." />
-        </StepLabel>
-        <input ref={coverRef} type="file" accept="image/*" onChange={onPickCover} style={QS_HIDDEN_INPUT} tabIndex={-1} />
-        {coverName ? (
-          <div className="qs-file qs-drop--filled">
-            <span className="qs-file__name"><QSIcon name="file-text" size={18} className="qs-file__ico" />{coverName}</span>
-            <button type="button" className="qs-payoff__again" onClick={() => coverRef.current && coverRef.current.click()}>Change</button>
-          </div>
-        ) : (
-          <button type="button" className="qs-drop" style={{ padding: 'var(--space-8) var(--space-6)' }} onClick={() => coverRef.current && coverRef.current.click()}>
-            <p className="qs-drop__line" style={{ fontSize: 'var(--fs-script)' }}>Have a cover? Add it.</p>
-            <p className="qs-drop__hint" style={{ textTransform: 'none', letterSpacing: 0, fontFamily: 'var(--font-body)', fontStyle: 'italic' }}>If not, I’ll make a simple one.</p>
-          </button>
-        )}
-      </div>
+      {/* 4 \u2014 Cover mood (AI suggestions) */}
+      {storyFile && (
+        <div className="qs-step">
+          <StepLabel n="4">
+            Cover mood
+            <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0, marginLeft: '0.4em' }}>
+              \u2014 optional
+            </span>
+            {' '}
+            <Tooltip text="I'll read your story and suggest atmospheric photos for the cover. Pick one, upload your own, or skip \u2014 I'll generate a clean typographic cover either way." />
+          </StepLabel>
 
-      {/* 5 — Begin */}
+          {suggestions.length === 0 && !suggestionsLoading && (
+            <button
+              type="button"
+              className="qs-drop"
+              style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-4)' }}
+              onClick={loadSuggestions}
+            >
+              <span className="qs-drop__ico"><QSIcon name="sparkles" size={22} /></span>
+              <p className="qs-drop__line" style={{ fontSize: 'var(--fs-script)' }}>Suggest covers from your story</p>
+              <p className="qs-drop__hint">I'll read your opening and find 3 atmospheric photos</p>
+            </button>
+          )}
+
+          {suggestionsLoading && (
+            <p className="qs-quiethint" style={{ marginBottom: 'var(--space-4)', fontStyle: 'italic' }}>
+              Reading your story and finding photos\u2026
+            </p>
+          )}
+
+          {suggestions.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 'var(--space-4)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              {suggestions.map((photo, i) => (
+                <PhotoCard
+                  key={i}
+                  photo={photo}
+                  selected={chosenPhoto && chosenPhoto.url === photo.url}
+                  onSelect={setChosenPhoto}
+                />
+              ))}
+            </div>
+          )}
+
+          {chosenPhoto && (
+            <p className="qs-quiethint" style={{ marginBottom: 'var(--space-3)' }}>
+              Photo by {chosenPhoto.photographer} via {chosenPhoto.source}.
+              {' '}
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', color: 'var(--ember-400)', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                onClick={() => setChosenPhoto(null)}
+              >
+                Clear
+              </button>
+            </p>
+          )}
+
+          {/* Upload your own cover */}
+          <input ref={coverRef} type="file" accept="image/*" onChange={onPickCover} style={QS_HIDDEN_INPUT} tabIndex={-1} />
+          {coverName ? (
+            <div className="qs-file qs-drop--filled">
+              <span className="qs-file__name"><QSIcon name="file-text" size={18} className="qs-file__ico" />{coverName}</span>
+              <button type="button" className="qs-payoff__again" onClick={() => coverRef.current && coverRef.current.click()}>Change</button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="qs-drop"
+              style={{ padding: 'var(--space-6) var(--space-6)' }}
+              onClick={() => coverRef.current && coverRef.current.click()}
+            >
+              <p className="qs-drop__line" style={{ fontSize: 'var(--fs-script)' }}>
+                {hasCover ? 'Or upload your own cover' : 'Have a cover? Upload it.'}
+              </p>
+              <p className="qs-drop__hint" style={{ textTransform: 'none', letterSpacing: 0, fontFamily: 'var(--font-body)', fontStyle: 'italic' }}>
+                {hasCover ? 'Replaces the selected photo' : 'If not, I\u2019ll make a simple one.'}
+              </p>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 5 \u2014 Begin */}
       <div className="qs-actionrow">
         <QSButton size="lg" disabled={!storyFile} onClick={begin}>Begin</QSButton>
-        <span className="qs-quiethint">When you’re ready. No rush.</span>
+        <span className="qs-quiethint">When you\u2019re ready. No rush.</span>
       </div>
     </div>
   );

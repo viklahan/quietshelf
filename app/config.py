@@ -142,3 +142,15 @@ def rate_limit_per_hour() -> int:
 
 def max_upload_mb() -> int:
     return int(os.getenv("MAX_UPLOAD_MB", str(DEFAULT_MAX_UPLOAD_MB)))
+
+
+def unsplash_access_key() -> str:
+    return os.getenv("UNSPLASH_ACCESS_KEY", "").strip()
+
+
+def pexels_api_key() -> str:
+    return os.getenv("PEXELS_API_KEY", "").strip()
+
+
+def pixabay_api_key() -> str:
+    return os.getenv("PIXABAY_API_KEY", "").strip()
