@@ -182,7 +182,7 @@ function About({ onNavigate }) {
           </p>
           <p className="qs-lantern-copy__body">
             Quiet Shelf is free forever. The AI is free. The code is free.
-            The <strong>Hetzner box that keeps it alive costs $23 a month.</strong>
+            The <strong>Cloud storage that keeps the lights on cost around $30 a month.</strong>
             {' '}If your story found its shelf here — keep the light on.
           </p>
           <a
