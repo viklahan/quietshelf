@@ -3,16 +3,20 @@ from __future__ import annotations
 
 from app import config
 from app.providers.base import Provider, ProviderConfigError
+from app.providers.cerebras import CerebrasProvider
 from app.providers.gemini import GeminiProvider
 from app.providers.groq import GroqProvider
 from app.providers.ollama import OllamaProvider
 from app.providers.openrouter import OpenRouterProvider
+from app.providers.waterfall import WaterfallProvider
 
 _PROVIDERS: dict[str, type[Provider]] = {
     GeminiProvider.name: GeminiProvider,
     GroqProvider.name: GroqProvider,
+    CerebrasProvider.name: CerebrasProvider,
     OllamaProvider.name: OllamaProvider,
     OpenRouterProvider.name: OpenRouterProvider,
+    WaterfallProvider.name: WaterfallProvider,
 }
 def get_provider() -> Provider:
     name = config.provider_name()

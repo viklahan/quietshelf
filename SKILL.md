@@ -1,6 +1,6 @@
 ---
-name: quiet-fight-club-design
-description: Use this skill to generate well-branded interfaces and assets for Quiet Fight Club, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
+name: quiet-shelf-design
+description: Use this skill to generate well-branded interfaces and assets for Quiet Shelf, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
 user-invocable: true
 ---
 

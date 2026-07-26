@@ -8,9 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DEFAULT_PROVIDER = "gemini"
+DEFAULT_WATERFALL_ORDER = ["gemini", "groq", "cerebras"]
 DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
     "groq": "llama-3.3-70b-versatile",
+    "cerebras": "llama-3.3-70b",
     "ollama": "qwen2.5:latest",
     "openrouter": "openai/gpt-oss-20b:free",
 }
@@ -27,7 +29,7 @@ DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 # Client-side pacing: max upstream requests per rolling minute, per provider.
 # Gemini's free tier allows ~10 RPM; 8 leaves headroom for anything else the
 # key is doing. 0 = unpaced. Ollama is local - never paced by default.
-DEFAULT_PROVIDER_RPM = {"gemini": 8}
+DEFAULT_PROVIDER_RPM = {"gemini": 8, "cerebras": 25}
 DEFAULT_RATE_LIMIT = 20  # requests per hour per IP
 DEFAULT_MAX_UPLOAD_MB = 25
 LLM_TIMEOUT_SECONDS = 120.0
@@ -75,6 +77,24 @@ def openrouter_api_key() -> str:
 
 def groq_api_key() -> str:
     return os.getenv("GROQ_API_KEY", "").strip()
+
+
+def cerebras_api_key() -> str:
+    return os.getenv("CEREBRAS_API_KEY", "").strip()
+
+
+def cerebras_model_name() -> str:
+    """Explicit Cerebras model override — leave empty to use the built-in list."""
+    return os.getenv("CEREBRAS_MODEL_NAME", "").strip()
+
+
+def waterfall_order() -> list[str]:
+    """Providers to try in order when LLM_PROVIDER=waterfall.
+    Override with WATERFALL_ORDER=gemini,groq,cerebras (comma-separated)."""
+    raw = os.getenv("WATERFALL_ORDER", "").strip()
+    if raw:
+        return [p.strip().lower() for p in raw.split(",") if p.strip()]
+    return list(DEFAULT_WATERFALL_ORDER)
 
 
 def ollama_host() -> str:
