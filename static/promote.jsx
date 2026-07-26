@@ -5,7 +5,7 @@ const QSDS_promo = window.QuietFightClubDesignSystem_fae847;
 const { Button: QSBtnPromo, Icon: QSIcoPromo, ScriptTextarea: QSScriptTA, ManuscriptCard } = QSDS_promo;
 
 const QS_MIN_WORDS = 100;
-const QS_MAX_WORDS = 3000;
+const QS_MAX_WORDS = 5000;
 
 function countWords(s) {
   const t = s.trim();
