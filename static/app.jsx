@@ -26,7 +26,7 @@ function App() {
     <div className="qs-app">
       <header className="qs-header">
         <button type="button" className="qs-brand" onClick={() => setTab('home')} aria-label="Quiet Shelf, home">
-          <img src="/static/assets/logo-mark.png" alt="" width="26" height="26" style={{ display: 'block' }} />
+          <img src="/static/assets/logo-mark.svg" alt="" width="26" height="26" style={{ display: 'block' }} />
           <span className="qs-brand__text">
             <span className="qs-brand__name">Quiet Shelf</span>
             <span className="qs-brand__sub">Your story, made real.</span>

@@ -1,5 +1,6 @@
-/* Quiet Shelf — Promote. Paste → word/runtime → calm map → segment cards.
-   Wired to POST /api/promote (JSON {script}) -> ShotList. */
+/* Quiet Shelf — Promote. Paste → word/runtime → progressive map → segment cards.
+   Now uses SSE streaming (/api/promote/stream) so the first segments appear
+   as soon as the fastest chunk finishes — no more waiting for the full map. */
 const QSDS_promo = window.QuietFightClubDesignSystem_fae847;
 const { Button: QSBtnPromo, Icon: QSIcoPromo, ScriptTextarea: QSScriptTA, ManuscriptCard } = QSDS_promo;
 
@@ -11,15 +12,11 @@ function countWords(s) {
   return t ? t.split(/\s+/).length : 0;
 }
 function runtimeFromWords(w) {
-  const secs = Math.round((w / 150) * 60); // ~150 narrated wpm
+  const secs = Math.round((w / 150) * 60);
   const m = Math.floor(secs / 60), s = secs % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return m + ':' + String(s).padStart(2, '0');
 }
 
-/* CONFIRMED against the live site (2026-07): the public pexels.com search
-   page honors ?orientation=landscape|portrait|square as a real filter, not
-   just its authenticated API — clicking the filter in-browser changes the
-   URL to exactly this. A precise param beats a hopeful word in the query. */
 function orientationParam(orientation) {
   if (orientation === 'horizontal') return '?orientation=landscape';
   if (orientation === 'vertical') return '?orientation=portrait';
@@ -27,12 +24,8 @@ function orientationParam(orientation) {
   return '';
 }
 
-/* Pull a few real, capitalized word-like tokens out of the writer's own
-   pasted text for the live loading screen — cheap, no extra model call, and
-   no accuracy claim (we don't check these are actually character names).
-   Falls back gracefully (returns []) when the text has no obvious proper
-   nouns, e.g. a piece with no named characters. */
-function pickTextTokens(text, count = 4) {
+function pickTextTokens(text, count) {
+  count = count || 4;
   const seen = new Set();
   const picked = [];
   const common = new Set(['The', 'This', 'That', 'They', 'Then', 'There', 'When', 'What', 'With', 'Her', 'His', 'And', 'But', 'For', 'You', 'Your']);
@@ -47,8 +40,6 @@ function pickTextTokens(text, count = 4) {
   return picked;
 }
 
-/* moodTone tints the card; it's purely visual. We derive it from the mood
-   word the backend returns so the colour matches the feeling. */
 function moodToTone(mood) {
   const m = (mood || '').toLowerCase();
   if (/(hope|warm|joy|resolved|tender|love|calm|peace|gentle)/.test(m)) return 'ember';
@@ -57,7 +48,6 @@ function moodToTone(mood) {
   return 'neutral';
 }
 
-/* Map a backend Segment to the ManuscriptCard's props. */
 function toCard(seg) {
   return {
     index: seg.id,
@@ -72,11 +62,7 @@ function toCard(seg) {
   };
 }
 
-/* Found-clip memory — clip links keyed to the CHARACTER, not the segment,
-   so the same person keeps the same footage across the whole video (and
-   across sessions: castings travel inside the saved story map file). */
 const QS_CASTINGS_KEY = 'qs.promote.castings';
-
 function loadCastings() {
   try { return JSON.parse(localStorage.getItem(QS_CASTINGS_KEY)) || {}; } catch (e) { return {}; }
 }
@@ -84,11 +70,7 @@ function saveCastings(c) {
   try { localStorage.setItem(QS_CASTINGS_KEY, JSON.stringify(c)); } catch (e) {}
 }
 
-/* The mapped result itself — a refresh must never cost the writer the API
-   call that produced it. Kept separately from castings (which already
-   survive refresh) since this is the shot list, not the clip links. */
 const QS_LAST_RESULT_KEY = 'qs.promote.lastresult';
-
 function loadLastResult() {
   try {
     const raw = localStorage.getItem(QS_LAST_RESULT_KEY);
@@ -113,125 +95,148 @@ function Promote() {
   const [error, setError] = React.useState('');
   const [found, setFound] = React.useState(() => { const r = loadLastResult(); return r ? (r.found || {}) : {}; });
   const [segs, setSegs] = React.useState(() => { const r = loadLastResult(); return r ? r.segs : []; });
-  // Footage orientation preference — affects only the "open in Pexels" quick
-  // link (see orientationSuffix); the editable search-term chips are untouched.
   const [orientation, setOrientation] = React.useState('both');
-  // The saved Story Map, if one exists. Found maps ground by default; an
-  // imagined map is strictly opt-in — invention never flows in silently.
   const [gmap] = React.useState(loadLastMap);
   const [useMap, setUseMap] = React.useState(() => {
     const m = loadLastMap();
     return !!(m && !m.fabricated);
   });
-  const [groundedBy, setGroundedBy] = React.useState(() => { const r = loadLastResult(); return r ? (r.groundedBy || null) : null; }); // {n, fabricated} of the run shown
+  const [groundedBy, setGroundedBy] = React.useState(() => { const r = loadLastResult(); return r ? (r.groundedBy || null) : null; });
   const [castings, setCastings] = React.useState(loadCastings);
+  const [totalChunks, setTotalChunks] = React.useState(0);
+  const [doneChunks, setDoneChunks] = React.useState(0);
+  const streamCleanupRef = React.useRef(null);
+
+  React.useEffect(() => () => { if (streamCleanupRef.current) streamCleanupRef.current(); }, []);
 
   const words = countWords(text);
 
-  /* Keep (or clear) the clip link for every character in a segment. */
   function keepClip(names, url) {
-    const next = { ...castings };
-    names.forEach((n) => {
-      if (url) next[n] = { url };
+    const next = Object.assign({}, castings);
+    names.forEach(function(n) {
+      if (url) next[n] = { url: url };
       else delete next[n];
     });
     setCastings(next);
     saveCastings(next);
   }
 
-  async function map() {
+  function map() {
     if (words < QS_MIN_WORDS) {
-      setError(`This looks like a fragment. Paste the full piece (at least ${QS_MIN_WORDS} words) for a proper visual map.`);
+      setError('This looks like a fragment. Paste the full piece (at least ' + QS_MIN_WORDS + ' words) for a proper visual map.');
       return;
     }
     if (words > QS_MAX_WORDS) {
-      setError(`That’s a long piece (${words.toLocaleString()} words). Split it into parts of ${QS_MAX_WORDS.toLocaleString()} words or fewer.`);
+      setError("That's a long piece (" + words.toLocaleString() + ' words). Split it into parts of ' + QS_MAX_WORDS.toLocaleString() + ' words or fewer.');
       return;
     }
     const grounding = useMap && gmap ? gmap : null;
     setError('');
     setFound({});
+    setSegs([]);
+    setGroundedBy(null);
+    setTotalChunks(0);
+    setDoneChunks(0);
     setPhase('becoming');
-    try {
-      const [shotlist] = await Promise.all([
-        window.QS_API.promote(text, grounding),
-        window.QS_API.calmDelay(1600),
-      ]);
-      const mappedSegs = (shotlist.segments || []).map(toCard);
-      const gb = grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null;
-      setSegs(mappedSegs);
-      setGroundedBy(gb);
-      saveLastResult({ segs: mappedSegs, groundedBy: gb, found: {} });
-      setPhase('done');
-    } catch (err) {
-      setError(err.message || 'Something went wrong. Try again.');
-      setPhase('compose');
-    }
+
+    const cleanup = window.QS_API.promoteStream(
+      text,
+      grounding,
+      {
+        onChunk: function(newSegs, done, total) {
+          setTotalChunks(total);
+          setDoneChunks(done);
+          setSegs(function(prev) {
+            const next = prev.concat(newSegs.map(toCard));
+            /* Switch to results view as soon as first chunk lands —
+               user can start clicking while the rest load in behind them. */
+            if (prev.length === 0 && next.length > 0) setPhase('done');
+            saveLastResult({
+              segs: next,
+              groundedBy: grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null,
+              found: {},
+            });
+            return next;
+          });
+        },
+        onDone: function(_title, _runtime) {
+          setGroundedBy(grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null);
+          setPhase('done');
+          setTotalChunks(0);
+          setDoneChunks(0);
+        },
+        onError: function(msg) {
+          setError(msg || 'The AI is unavailable right now. Try again in a minute.');
+          setPhase('compose');
+          setTotalChunks(0);
+          setDoneChunks(0);
+        },
+      }
+    );
+    streamCleanupRef.current = cleanup;
   }
 
   function toggle(i, v) {
-    setFound((p) => {
-      const next = { ...p, [i]: v };
-      saveLastResult({ segs, groundedBy, found: next });
+    setFound(function(p) {
+      const next = Object.assign({}, p, { [i]: v });
+      saveLastResult({ segs: segs, groundedBy: groundedBy, found: next });
       return next;
     });
   }
 
-  /* Edit one search term in place. The card's search links read straight from
-     these terms, so an edit re-points the stock-footage search immediately. */
   function editTerm(cardIdx, termIdx, value) {
-    setSegs((prev) => {
-      const next = prev.map((s, i) =>
-        i === cardIdx
-          ? { ...s, terms: s.terms.map((t, j) => (j === termIdx ? value : t)) }
-          : s
-      );
-      saveLastResult({ segs: next, groundedBy, found });
+    setSegs(function(prev) {
+      const next = prev.map(function(s, i) {
+        return i === cardIdx
+          ? Object.assign({}, s, { terms: s.terms.map(function(t, j) { return j === termIdx ? value : t; }) })
+          : s;
+      });
+      saveLastResult({ segs: next, groundedBy: groundedBy, found: found });
       return next;
     });
   }
-  const doneCount = segs.filter((s) => found[s.index]).length;
+
+  const doneCount = segs.filter(function(s) { return found[s.index]; }).length;
 
   function notionText() {
-    return segs.map((s) =>
-      `## ${String(s.index).padStart(2, '0')} · ${s.startTime}–${s.endTime} · ${s.mood}\n` +
-      `${s.excerpt}\n` +
-      `Clip ~${s.clipDurationSeconds}s\n` +
-      `Search: ${s.terms.join(' / ')}\n`
-    ).join('\n');
+    return segs.map(function(s) {
+      return '## ' + String(s.index).padStart(2, '0') + ' \u00b7 ' + s.startTime + '\u2013' + s.endTime + ' \u00b7 ' + s.mood + '\n' +
+        s.excerpt + '\n' +
+        'Clip ~' + s.clipDurationSeconds + 's\n' +
+        'Search: ' + s.terms.join(' / ') + '\n';
+    }).join('\n');
+  }
+
+  function clearAll() {
+    setPhase('compose');
+    setFound({});
+    setSegs([]);
+    setGroundedBy(null);
+    saveLastResult(null);
   }
 
   if (phase === 'becoming') {
-    // Read the writer's OWN pasted text back to them while the real work runs
-    // — proves the engine is actually reading their piece, not spinning a
-    // generic spinner. Cheap client-side token pull, no extra model call.
     const tokens = pickTextTokens(text);
     const tokenTemplates = [
-      (t) => `Finding a shot for ${t}…`,
-      (t) => `Picturing a scene with ${t}…`,
-      (t) => `Placing ${t} on the timeline…`,
+      function(t) { return 'Finding a shot for ' + t + '\u2026'; },
+      function(t) { return 'Picturing a scene with ' + t + '\u2026'; },
+      function(t) { return 'Placing ' + t + ' on the timeline\u2026'; },
     ];
-    const tokenLines = tokens.map((t, i) => tokenTemplates[i % tokenTemplates.length](t));
-    const lines = [
-      'Reading your piece…',
-      ...tokenLines,
-      'Breaking it into scenes…',
-      'Choosing search terms…',
-      'Still working — free models can be slow…',
-    ];
+    const tokenLines = tokens.map(function(t, i) { return tokenTemplates[i % tokenTemplates.length](t); });
+    const lines = ['Reading your piece\u2026'].concat(tokenLines).concat([
+      'Breaking it into scenes\u2026',
+      'Choosing search terms\u2026',
+      'Still working \u2014 free models can be slow\u2026',
+    ]);
     return (
       <div className="qs-page">
-        <Becoming
-          lines={lines}
-          sub="Mapping your footage."
-          duration={3600}
-          onDone={() => {}}
-        />
+        <Becoming lines={lines} sub="Mapping your footage." duration={3600} onDone={function() {}} />
       </div>
     );
   }
 
   if (phase === 'done') {
+    const isLoading = totalChunks > 0 && doneChunks < totalChunks;
     return (
       <div className="qs-page">
         <p className="qs-lead">Your visuals, scene by scene. Open a search, find the clip, check it off.</p>
@@ -239,104 +244,125 @@ function Promote() {
         <div className="qs-mapline">
           <QSIcoPromo name="list-checks" size={16} />
           <span className="qs-mapline__count">{String(doneCount).padStart(2, '0')} of {String(segs.length).padStart(2, '0')} mapped</span>
+          {isLoading ? (
+            <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
+              {'\u2014 mapping segment ' + doneChunks + ' of ' + totalChunks + '\u2026'}
+            </span>
+          ) : null}
           <span style={{ flex: 1 }}></span>
+          <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={clearAll}>
+            <QSIcoPromo name="rotate-ccw" size={13} />New piece
+          </button>
           <CopyButton text={notionText()} label="Copy for Notion" />
         </div>
+
         {groundedBy ? (
           <p className="qs-quiethint" style={{ margin: '0 0 var(--space-6) 0' }}>
-            Grounded by your story map · {groundedBy.n} {groundedBy.n === 1 ? 'character' : 'characters'}
-            {groundedBy.fabricated ? ' · imagined cast, on your request' : ''}
+            Grounded by your story map {'\u00b7'} {groundedBy.n} {groundedBy.n === 1 ? 'character' : 'characters'}
+            {groundedBy.fabricated ? ' \u00b7 imagined cast, on your request' : ''}
           </p>
         ) : null}
 
         <div className="qs-board">
-          {segs.map((s, idx) => (
-            <div className="qs-deal" key={s.index} style={{ animationDelay: (idx * 60) + 'ms' }}>
-              <ManuscriptCard
-                index={s.index}
-                startTime={s.startTime}
-                endTime={s.endTime}
-                excerpt={s.excerpt}
-                mood={s.mood}
-                moodTone={s.moodTone}
-                clipDurationSeconds={s.clipDurationSeconds}
-                terms={s.terms}
-                onTermChange={(ti, v) => editTerm(idx, ti, v)}
-                found={!!found[s.index]}
-                onFoundChange={(v) => toggle(s.index, v)}
-              />
-              <div className="qs-casting">
-                {s.terms.length ? (
-                  <a
-                    className="qs-casting__link"
-                    href={`https://www.pexels.com/search/videos/${encodeURIComponent(s.terms[0])}/${orientationParam(orientation)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open best match in Pexels{orientation !== 'both' ? ` (${orientation})` : ''} ↗
-                  </a>
-                ) : null}
-                {s.cast.filter((n) => castings[n] && castings[n].url).map((n) => (
-                  <a key={n} className="qs-casting__link" href={castings[n].url} target="_blank" rel="noreferrer">
-                    You used this clip for {n} ↗
-                  </a>
-                ))}
-                {found[s.index] && s.cast.length ? (
-                  <input
-                    className="qs-input qs-casting__input"
-                    placeholder={`Keep the clip link for ${s.cast.join(' & ')} — paste it here…`}
-                    defaultValue={(castings[s.cast[0]] || {}).url || ''}
-                    onBlur={(e) => keepClip(s.cast, e.target.value.trim())}
-                    aria-label={`Clip link for ${s.cast.join(' and ')}`}
-                  />
-                ) : null}
+          {segs.map(function(s, idx) {
+            return (
+              <div className="qs-deal" key={s.index} style={{ animationDelay: (idx * 60) + 'ms' }}>
+                <ManuscriptCard
+                  index={s.index}
+                  startTime={s.startTime}
+                  endTime={s.endTime}
+                  excerpt={s.excerpt}
+                  mood={s.mood}
+                  moodTone={s.moodTone}
+                  clipDurationSeconds={s.clipDurationSeconds}
+                  terms={s.terms}
+                  onTermChange={function(ti, v) { editTerm(idx, ti, v); }}
+                  found={!!found[s.index]}
+                  onFoundChange={function(v) { toggle(s.index, v); }}
+                />
+                <div className="qs-casting">
+                  {s.terms.length ? (
+                    <a
+                      className="qs-casting__link"
+                      href={'https://www.pexels.com/search/videos/' + encodeURIComponent(s.terms[0]) + '/' + orientationParam(orientation)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {'Open best match in Pexels' + (orientation !== 'both' ? ' (' + orientation + ')' : '') + ' \u2197'}
+                    </a>
+                  ) : null}
+                  {s.cast.filter(function(n) { return castings[n] && castings[n].url; }).map(function(n) {
+                    return (
+                      <a key={n} className="qs-casting__link" href={castings[n].url} target="_blank" rel="noreferrer">
+                        {'You used this clip for ' + n + ' \u2197'}
+                      </a>
+                    );
+                  })}
+                  {found[s.index] && s.cast.length ? (
+                    <input
+                      className="qs-input qs-casting__input"
+                      placeholder={'Keep the clip link for ' + s.cast.join(' & ') + ' \u2014 paste it here\u2026'}
+                      defaultValue={(castings[s.cast[0]] || {}).url || ''}
+                      onBlur={function(e) { keepClip(s.cast, e.target.value.trim()); }}
+                      aria-label={'Clip link for ' + s.cast.join(' and ')}
+                    />
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="qs-actionrow qs-actionrow--center" style={{ marginTop: 'var(--space-12)' }}>
-          <button type="button" className="qs-payoff__again" onClick={() => { setPhase('compose'); setFound({}); setSegs([]); setGroundedBy(null); saveLastResult(null); }}>
-            <QSIcoPromo name="rotate-ccw" size={13} />Map a different piece
-          </button>
-        </div>
+        {isLoading ? (
+          <p className="qs-quiethint" style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
+            More segments on their way\u2026
+          </p>
+        ) : (
+          <div className="qs-actionrow qs-actionrow--center" style={{ marginTop: 'var(--space-12)' }}>
+            <button type="button" className="qs-payoff__again" onClick={clearAll}>
+              <QSIcoPromo name="rotate-ccw" size={13} />Map a different piece
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="qs-page">
-      <p className="qs-lead">Paste your writing. I’ll map it into a calm shot-by-shot video plan.</p>
+      <p className="qs-lead">Paste your writing. I'll map it into a calm shot-by-shot video plan.</p>
       <QSScriptTA
         value={text}
         onChange={setText}
-        placeholder="Paste your writing here…"
+        placeholder="Paste your writing here\u2026"
         minHeight={260}
         ariaLabel="Your writing"
       />
       <div className="qs-meter">
         <span><strong>{words.toLocaleString()}</strong> words</span>
-        <span aria-hidden="true">·</span>
-        <span>≈ <strong>{runtimeFromWords(words)}</strong> runtime</span>
-        {text ? <><span aria-hidden="true">·</span><span>draft kept</span></> : null}
+        <span aria-hidden="true">{'\u00b7'}</span>
+        <span>{'\u2248 '}<strong>{runtimeFromWords(words)}</strong>{' runtime'}</span>
+        {text ? <React.Fragment><span aria-hidden="true">{'\u00b7'}</span><span>draft kept</span></React.Fragment> : null}
       </div>
       {gmap ? <GroundRow map={gmap} use={useMap} onChange={setUseMap} /> : null}
       <div className="qs-groundrow" role="radiogroup" aria-label="Preferred footage orientation">
-        {['both', 'horizontal', 'vertical', 'square'].map((o) => (
-          <button
-            key={o}
-            type="button"
-            role="radio"
-            aria-checked={orientation === o}
-            className={`qs-pill${orientation === o ? ' qs-pill--on' : ''}`}
-            onClick={() => setOrientation(o)}
-          >
-            {o === 'both' ? 'Any' : o === 'horizontal' ? 'Horizontal' : o === 'vertical' ? 'Vertical' : 'Square'}
-          </button>
-        ))}
-        <Tooltip text="Filters the “open in Pexels” link to wide (horizontal, e.g. YouTube), tall (vertical, e.g. Reels/TikTok/Shorts), or square footage. Your editable search terms below are unaffected." />
+        {['both', 'horizontal', 'vertical', 'square'].map(function(o) {
+          return (
+            <button
+              key={o}
+              type="button"
+              role="radio"
+              aria-checked={orientation === o}
+              className={'qs-pill' + (orientation === o ? ' qs-pill--on' : '')}
+              onClick={function() { setOrientation(o); }}
+            >
+              {o === 'both' ? 'Any' : o === 'horizontal' ? 'Horizontal' : o === 'vertical' ? 'Vertical' : 'Square'}
+            </button>
+          );
+        })}
+        <Tooltip text="Filters the open-in-Pexels link to wide (horizontal), tall (vertical), or square footage. Your editable search terms are unaffected." />
       </div>
-      {error ? <p className="qs-note"><QSIcoPromo name="circle-alert" size={16} />{error}</p> : null}
+      {error ? <p className="qs-note"><QSIcoPromo name="circle-alert" size={16} /><span>{error}</span></p> : null}
       <div className="qs-actionrow">
         <QSBtnPromo size="lg" icon="sparkles" onClick={map}>Map my visuals</QSBtnPromo>
       </div>

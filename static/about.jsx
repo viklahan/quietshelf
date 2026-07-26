@@ -71,7 +71,7 @@ function About({ onNavigate }) {
       <div className="qs-home__hero">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <img
-            src="/static/assets/logo-mark.png"
+            src="/static/assets/logo-mark.svg"
             alt=""
             width="52"
             height="52"

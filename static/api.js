@@ -134,6 +134,52 @@
     return await resp.json();
   }
 
+  // POST /api/promote/stream (SSE) -> yields segments progressively
+  // onChunk(segments, chunksD one, totalChunks) called as each chunk arrives
+  // onDone(title, runtimeSeconds) called when complete
+  // onError(message) called on failure
+  // Returns a cleanup function to abort the stream
+  function promoteStream(script, storyMap, { onChunk, onDone, onError }) {
+    let aborted = false;
+    const ctrl = new AbortController();
+
+    fetch(BASE + '/api/promote/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script, story_map: storyMap || null }),
+      signal: ctrl.signal,
+    }).then(async (resp) => {
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        onError(data?.detail || 'The AI is unavailable right now. Try again in a minute.');
+        return;
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (!aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop(); // keep incomplete last line
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks);
+            else if (evt.type === 'done') onDone(evt.title, evt.estimated_runtime_seconds);
+            else if (evt.type === 'error') onError(evt.message);
+          } catch (e) { /* malformed line, skip */ }
+        }
+      }
+    }).catch((err) => {
+      if (!aborted) onError(err.message || 'Stream interrupted.');
+    });
+
+    return () => { aborted = true; ctrl.abort(); };
+  }
+
   // GET /api/health -> { status, provider, services[] }
   async function health() {
     const resp = await fetch(BASE + '/api/health');
@@ -159,7 +205,7 @@
   }
 
   window.QS_API = {
-    fetchThemes, formatBook, generateBlurb, promote,
+    fetchThemes, formatBook, generateBlurb, promote, promoteStream,
     storymapScan, storymapMap, storymapImagine,
     health, sendFeedback, calmDelay,
   };
