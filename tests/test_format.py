@@ -261,3 +261,95 @@ def test_format_endpoint_rejects_unsupported(client, tmp_path):
         )
     assert response.status_code == 415
     assert response.json()["error"] == "unsupported_format"
+
+
+# ---------------------------------------------------------------------------
+# Chapter normalizer tests (new)
+# ---------------------------------------------------------------------------
+
+def test_normalise_chapter_one_variants():
+    from app.services.format.converter import _normalise_chapters
+
+    cases = [
+        "Chapter One",
+        "CHAPTER 1",
+        "chapter i",
+        "Ch. 3",
+        "Chapter Seven: The Return",
+        "Part II",
+        "PART TWO",
+        "Prologue",
+        "Epilogue",
+        "Introduction",
+    ]
+    for case in cases:
+        result = _normalise_chapters(case + "\n\nSome prose.")
+        h1s = [l for l in result.splitlines() if l.startswith("# ")]
+        assert h1s, f"Expected H1 heading for: {repr(case)}"
+
+
+def test_normalise_promotes_h2_to_h1():
+    from app.services.format.converter import _normalise_chapters
+
+    text = "## Chapter Eight\n\nSome prose here."
+    result = _normalise_chapters(text)
+    assert "# Chapter Eight" in result
+    assert "## Chapter Eight" not in result
+
+
+def test_normalise_preserves_existing_h1():
+    from app.services.format.converter import _normalise_chapters
+
+    text = "# Chapter One\n\nSome prose."
+    result = _normalise_chapters(text)
+    h1s = [l for l in result.splitlines() if l.startswith("# ")]
+    assert len(h1s) == 1
+    assert h1s[0] == "# Chapter One"
+
+
+def test_normalise_does_not_promote_prose():
+    from app.services.format.converter import _normalise_chapters
+
+    prose = "The quick brown fox jumps over the lazy dog."
+    result = _normalise_chapters(prose)
+    assert not any(l.startswith("# ") for l in result.splitlines())
+
+
+def test_normalise_collapses_blank_lines():
+    from app.services.format.converter import _normalise_chapters
+
+    text = "Chapter One\n\n\n\n\nSome prose."
+    result = _normalise_chapters(text)
+    # No consecutive blank lines in output
+    lines = result.splitlines()
+    for i in range(len(lines) - 1):
+        assert not (lines[i] == "" and lines[i + 1] == ""), "Consecutive blank lines found"
+
+
+def test_normalise_four_chapters_produces_four_h1s():
+    from app.services.format.converter import _normalise_chapters
+
+    text = (
+        "CHAPTER ONE\n\nFirst chapter prose.\n\n"
+        "Chapter Two: The Return\n\nSecond chapter prose.\n\n"
+        "## Chapter Three\n\nThird chapter prose.\n\n"
+        "Prologue\n\nPrologue prose."
+    )
+    result = _normalise_chapters(text)
+    h1s = [l for l in result.splitlines() if l.startswith("# ")]
+    assert len(h1s) == 4
+
+
+def test_format_endpoint_empty_author_does_not_error(client, sample_docx):
+    """An empty author field must not produce [object Object] or a 500 —
+    the backend should accept it and fall back to a placeholder."""
+    with open(sample_docx, "rb") as fh:
+        response = client.post(
+            "/api/format",
+            data={"title": "My Stories", "author": "", "theme": "classic"},
+            files={"file": ("manuscript.docx", fh, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+    # Should succeed — the frontend now sends 'Unknown Author' as fallback,
+    # but even an empty string should not crash the backend.
+    assert response.status_code == 200
+    assert response.content[:2] == b"PK"

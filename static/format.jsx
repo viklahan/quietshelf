@@ -153,7 +153,7 @@ function Format() {
         window.QS_API.formatBook({
           file: storyFile,
           title: title || stemFromFileName(storyFile.name),
-          author: author,
+          author: author || 'Unknown Author',
           theme: theme,
           cover: coverFile,
         }),
@@ -258,7 +258,7 @@ function Format() {
             <p className="qs-drop__hint">Word, RTF, or text</p>
           </button>
         )}
-        {error ? <p className="qs-note"><QSIcon name="circle-alert" size={16} />{error}</p> : null}
+        {error ? <p className="qs-note"><QSIcon name="circle-alert" size={16} /><span>{String(error)}</span></p> : null}
       </div>
 
       {/* 2 — Title & author */}

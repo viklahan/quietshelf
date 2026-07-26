@@ -44,7 +44,7 @@ class GroqProvider(Provider):
             max_retries=0,
         )
 
-        primary = config.model_name()
+        primary = config.model_name("groq")
         fallbacks = config.groq_fallback_models()
         # Start with the configured model, then try fallbacks if it's gone
         models_to_try = [primary] + [m for m in fallbacks if m != primary]

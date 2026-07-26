@@ -30,7 +30,7 @@ class OllamaProvider(Provider):
     ) -> str:
         host = config.ollama_host()
         payload = {
-            "model": config.model_name(),
+            "model": config.model_name("ollama"),
             "system": system_prompt,
             "prompt": user_content,
             "stream": False,
@@ -52,8 +52,8 @@ class OllamaProvider(Provider):
             ) from exc
         if response.status_code == 404:
             raise ProviderError(
-                f"Ollama doesn't have the model '{config.model_name()}'. "
-                f"Run: ollama pull {config.model_name()}"
+                f"Ollama doesn't have the model '{config.model_name('ollama')}'. "
+                f"Run: ollama pull {config.model_name('ollama')}"
             )
         if response.status_code == 429:
             raise ProviderRateLimited("Ollama returned HTTP 429")

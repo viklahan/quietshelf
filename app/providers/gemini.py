@@ -38,18 +38,22 @@ class GeminiProvider(Provider):
                 timeout=int(config.LLM_TIMEOUT_SECONDS * 1000)  # milliseconds
             ),
         )
+        model = config.model_name("gemini")
+        # This is structured extraction / short-form copy, not reasoning -
+        # 2.5 Flash's default "thinking" only adds latency, so turn it off
+        # there. thinking_budget is a 2.5-era knob: newer models (including
+        # whatever gemini-flash-latest points at) reject it with HTTP 400.
+        thinking = (
+            genai_types.ThinkingConfig(thinking_budget=0) if "2.5-flash" in model else None
+        )
         try:
             response = client.models.generate_content(
-                model=config.model_name(),
+                model=model,
                 contents=user_content,
                 config=genai_types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     response_mime_type="application/json" if json_mode else None,
-                    # This is structured extraction / short-form copy, not
-                    # reasoning - Gemini 2.5 Flash's default "thinking" only adds
-                    # latency here, so turn it off. (Flash/Flash-Lite support
-                    # thinking_budget=0; 2.5-pro does not.)
-                    thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                    thinking_config=thinking,
                 ),
             )
         except genai_errors.APIError as exc:

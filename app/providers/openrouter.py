@@ -53,7 +53,7 @@ class OpenRouterProvider(Provider):
     def _model_candidates(self) -> list[str]:
         """The configured model first, then any fallbacks not already in it."""
         candidates: list[str] = []
-        primary = config.model_name()
+        primary = config.model_name("openrouter")
         if primary:
             candidates.append(primary)
         for model in config.openrouter_fallback_models():

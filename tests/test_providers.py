@@ -24,6 +24,29 @@ SYSTEM = "test system prompt mentioning JSON"
 USER = "a script"
 
 
+def test_model_name_resolves_per_provider_under_waterfall(monkeypatch):
+    """Under LLM_PROVIDER=waterfall each provider must resolve its OWN default
+    model. The old global lookup returned "" (no 'waterfall' key), which the
+    MODEL_NAME env var had been masking - gemini then 500'd with
+    'model is required.'"""
+    from app import config
+
+    monkeypatch.setenv("LLM_PROVIDER", "waterfall")
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    assert config.model_name("gemini") == config.DEFAULT_MODELS["gemini"]
+    assert config.model_name("groq") == config.DEFAULT_MODELS["groq"]
+    assert config.model_name("openrouter") == config.DEFAULT_MODELS["openrouter"]
+    assert config.model_name("ollama") == config.DEFAULT_MODELS["ollama"]
+
+
+def test_model_name_env_override_still_wins(monkeypatch):
+    from app import config
+
+    monkeypatch.setenv("MODEL_NAME", "my-explicit-model")
+    assert config.model_name("gemini") == "my-explicit-model"
+    assert config.model_name() == "my-explicit-model"
+
+
 def test_default_provider_is_gemini(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     assert isinstance(get_provider(), GeminiProvider)
@@ -113,6 +136,40 @@ def test_gemini_500_becomes_provider_error(monkeypatch):
     _patch_gemini(monkeypatch, exc)
     with pytest.raises(ProviderError):
         GeminiProvider().generate(SYSTEM, USER)
+
+
+def _capture_gemini_kwargs(monkeypatch):
+    captured = {}
+
+    class _CapModels:
+        def generate_content(self, **kwargs):
+            captured.update(kwargs)
+            return _FakeGeminiResponse("{}")
+
+    class _CapClient:
+        def __init__(self, **kwargs):
+            self.models = _CapModels()
+
+    monkeypatch.setattr(gemini_mod.genai, "Client", _CapClient)
+    return captured
+
+
+def test_gemini_no_thinking_config_on_non_25_models(monkeypatch):
+    """thinking_budget=0 is a Gemini 2.5-era knob; newer models reject it with
+    HTTP 400 (confirmed live on gemini-flash-latest 2026-07-26). Only send it
+    to 2.5 models."""
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "waterfall")  # default: gemini-flash-latest
+    captured = _capture_gemini_kwargs(monkeypatch)
+    GeminiProvider().generate(SYSTEM, USER, json_mode=True)
+    assert captured["config"].thinking_config is None
+
+
+def test_gemini_keeps_thinking_budget_zero_on_25_flash(monkeypatch):
+    monkeypatch.setenv("MODEL_NAME", "gemini-2.5-flash-lite")
+    captured = _capture_gemini_kwargs(monkeypatch)
+    GeminiProvider().generate(SYSTEM, USER, json_mode=True)
+    assert captured["config"].thinking_config.thinking_budget == 0
 
 
 class _FakeGroqChoice:

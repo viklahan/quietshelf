@@ -10,7 +10,10 @@ load_dotenv()
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_WATERFALL_ORDER = ["gemini", "groq", "cerebras"]
 DEFAULT_MODELS = {
-    "gemini": "gemini-2.5-flash",
+    # -latest alias: Google retires pinned models while still listing them
+    # (gemini-2.5-flash 404'd on generateContent July 2026); the alias tracks
+    # the current stable flash so the gemini leg self-heals.
+    "gemini": "gemini-flash-latest",
     "groq": "openai/gpt-oss-120b",
     "cerebras": "gpt-oss-120b",
     "ollama": "qwen2.5:latest",
@@ -52,9 +55,12 @@ def provider_name() -> str:
     return os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER).strip().lower()
 
 
-def model_name() -> str:
+def model_name(provider: str | None = None) -> str:
+    """Model for `provider` (defaults to the active LLM_PROVIDER). Providers
+    must pass their own name so waterfall members resolve their own defaults -
+    the global provider name is 'waterfall', which has no model."""
     override = os.getenv("MODEL_NAME", "").strip()
-    return override or DEFAULT_MODELS.get(provider_name(), "")
+    return override or DEFAULT_MODELS.get(provider or provider_name(), "")
 
 
 def provider_rpm(provider: str) -> int:
