@@ -376,11 +376,8 @@ function Format() {
         <div className="qs-step">
           <StepLabel n="4">
             Cover mood
-            <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0, marginLeft: '0.4em' }}>
-              \u2014 optional
-            </span>
             {' '}
-            <Tooltip text="I'll read your story and suggest atmospheric photos for the cover. Pick one, upload your own, or skip \u2014 I'll generate a clean typographic cover either way." />
+            <Tooltip text="I'll read your story and suggest atmospheric photos for the cover. Pick one, upload your own, or skip — I'll generate a clean typographic cover either way." />
           </StepLabel>
 
           {suggestions.length === 0 && !suggestionsLoading && (
