@@ -122,7 +122,7 @@ function PhotoCard({ photo, selected, onSelect }) {
           fontFamily: 'var(--font-body)', lineHeight: 1.2,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          {photo.photographer} \u00b7 {photo.source}
+          {photo.photographer} · {photo.source}
         </p>
       </div>
     </button>
@@ -459,7 +459,7 @@ function Format() {
       {/* 5 \u2014 Begin */}
       <div className="qs-actionrow">
         <QSButton size="lg" disabled={!storyFile} onClick={begin}>Begin</QSButton>
-        <span className="qs-quiethint">When you\u2019re ready. No rush.</span>
+        <span className="qs-quiethint">When you're ready. No rush.</span>
       </div>
     </div>
   );
