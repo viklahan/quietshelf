@@ -12,11 +12,26 @@ const QS_HIDDEN_INPUT = {
 };
 
 const QS_TONES = [
-  { id: 'warm', label: 'Warm' },
-  { id: 'literary', label: 'Literary' },
-  { id: 'punchy', label: 'Punchy' },
-  { id: 'mysterious', label: 'Mysterious' },
+  { id: 'warm', label: 'Warm', eg: 'A story about finding your way home — and the people who help you get there.' },
+  { id: 'literary', label: 'Literary', eg: 'In the silence between sentences, the truth of who we are quietly assembles itself.' },
+  { id: 'punchy', label: 'Punchy', eg: 'She had 48 hours. One name. No backup.' },
+  { id: 'mysterious', label: 'Mysterious', eg: 'Something followed her home. She just didn’t know it yet.' },
 ];
+
+const QS_LENGTHS = [
+  { id: 'short', label: 'Short' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'full', label: 'Full' },
+];
+
+/* kept blurbs — saved runs the writer chose to keep */
+const QS_KEPT_KEY = 'qs.blurb.kept';
+function loadKeptBlurbs() {
+  try { return JSON.parse(localStorage.getItem(QS_KEPT_KEY)) || []; } catch (e) { return []; }
+}
+function saveKeptBlurbs(list) {
+  try { localStorage.setItem(QS_KEPT_KEY, JSON.stringify(list.slice(0, 12))); } catch (e) {}
+}
 
 function countWordsB(s) {
   const t = (s || '').trim();
@@ -43,9 +58,13 @@ function Blurb() {
   const [text, setText] = useKeptDraft('qs.draft.blurb');
   const [file, setFile] = React.useState(null);
   const [tone, setTone] = React.useState('warm');
-  const [length] = React.useState('medium');
+  const [length, setLength] = React.useState('medium');
   const [error, setError] = React.useState('');
   const [result, setResult] = React.useState(null);
+  const [take, setTake] = React.useState(0);
+  const [comps, setComps] = React.useState([]);
+  const [kept, setKept] = React.useState(loadKeptBlurbs);
+  const [justKept, setJustKept] = React.useState(false);
   // The saved Story Map, if one exists. Found maps ground by default; an
   // imagined map is strictly opt-in — invention never flows in silently.
   const [gmap] = React.useState(loadLastMap);
@@ -93,6 +112,9 @@ function Blurb() {
         window.QS_API.calmDelay(1600),
       ]);
       setResult(res);
+      setTake(0);
+      setComps(res.comps || []);
+      setJustKept(false);
       setGroundedBy(grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null);
       setPhase('done');
     } catch (err) {
@@ -119,6 +141,19 @@ function Blurb() {
     const keywords = result.keywords || [];
     const taglineCopy = taglines.map((t, i) => `${i + 1}. ${t}`).join('\n');
     const { Stamp: QSStampB } = QSDS_blurb;
+    /* Works today (single back_cover) and with the three-takes API (back_cover_variants). */
+    const variants = (result.back_cover_variants && result.back_cover_variants.length) ? result.back_cover_variants : [result.back_cover];
+    const takeIdx = Math.min(take, variants.length - 1);
+    const keepThis = () => {
+      const entry = {
+        id: 'k' + Date.now(), ts: Date.now(), tone, length,
+        back_cover: variants[takeIdx], taglines, keywords,
+        short_description: result.short_description,
+        query_paragraph: result.query_paragraph, comps,
+      };
+      const next = [entry, ...kept];
+      setKept(next); saveKeptBlurbs(next); setJustKept(true);
+    };
     return (
       <div className="qs-page qs-page--narrow">
         <p className="qs-lead">Here are your words. Take the ones that feel like the book.</p>
@@ -129,9 +164,35 @@ function Blurb() {
           </p>
         ) : null}
         <div className="qs-results">
-          <RCard label="Back-cover copy" copyText={result.back_cover}>
-            <p className="qs-backcover">{result.back_cover}</p>
-          </RCard>
+          <section>
+            <div className="qs-rcard__head" style={{ border: 'none', margin: '0 0 var(--space-4)', padding: 0 }}>
+              <span className="qs-rcard__label">Back-cover copy</span>
+            </div>
+            {variants.length > 1 ? (
+              <div className="qs-takes" role="radiogroup" aria-label="Back-cover takes">
+                {variants.map((v, i) => (
+                  <button key={i} type="button" role="radio" aria-checked={takeIdx === i}
+                    className={`qs-take${takeIdx === i ? ' qs-take--on' : ''}`}
+                    onClick={() => setTake(i)}>Take {String(i + 1).padStart(2, '0')}</button>
+                ))}
+              </div>
+            ) : null}
+            <div className="qs-bcr" aria-label="Back cover preview">
+              <hr className="qs-bcr__rule" />
+              <p className="qs-bcr__text">{variants[takeIdx]}</p>
+              <hr className="qs-bcr__rule" />
+              <div className="qs-bcr__code" aria-hidden="true">
+                <span className="qs-bcr__bars"></span>
+                <span className="qs-bcr__isbn">ISBN 978-1-83904-627-1</span>
+              </div>
+            </div>
+            <div className="qs-bcr-actions">
+              <window.CopyButton text={variants[takeIdx]} label="Copy back-cover copy" />
+              <button type="button" className="qs-copy" onClick={keepThis} disabled={justKept}>
+                <QSIcoBlurb name={justKept ? 'check' : 'feather'} size={13} />{justKept ? 'Kept on your shelf' : 'Keep this blurb'}
+              </button>
+            </div>
+          </section>
 
           <RCard label="Taglines" copyText={taglineCopy}>
             <ul className="qs-taglines">
@@ -144,9 +205,27 @@ function Blurb() {
             </ul>
           </RCard>
 
+          {result.query_paragraph ? (
+            <RCard label="Query paragraph" copyText={result.query_paragraph}>
+              <p className="qs-store">{result.query_paragraph}</p>
+            </RCard>
+          ) : null}
+
           <RCard label="Store description" copyText={result.short_description}>
             <p className="qs-store">{result.short_description}</p>
           </RCard>
+
+          {comps.length ? (
+            <RCard label="Comp titles" copyText={comps.join('\n')}>
+              <div className="qs-comps">
+                {comps.map((c, i) => (
+                  <input key={i} className="qs-compinput" value={c} aria-label={`Comp title ${i + 1}`}
+                    onChange={(e) => setComps((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))} />
+                ))}
+              </div>
+              <p className="qs-quiethint" style={{ marginTop: 'var(--space-3)' }}>Suggestions to edit — you know your shelf best.</p>
+            </RCard>
+          ) : null}
 
           <RCard label="Suggested keywords" copyText={keywords.join(', ')}>
             <div className="qs-keywords">
@@ -155,11 +234,8 @@ function Blurb() {
           </RCard>
         </div>
         <div className="qs-actionrow">
-          <button type="button" className="qs-payoff__again" onClick={() => { setPhase('compose'); setText(''); setFile(null); setResult(null); setGroundedBy(null); if (fileRef.current) fileRef.current.value = ''; }}>
-            <QSIcoBlurb name="rotate-ccw" size={13} />New piece
-          </button>
           <button type="button" className="qs-payoff__again" onClick={() => setPhase('compose')}>
-            <QSIcoBlurb name="refresh-cw" size={13} />Try a different tone
+            <QSIcoBlurb name="rotate-ccw" size={13} />Try a different tone
           </button>
         </div>
       </div>
@@ -171,13 +247,16 @@ function Blurb() {
       <p className="qs-lead">Paste your story, or bring the file. I’ll find the words to describe it.</p>
 
       <div className="qs-step">
-        <ScriptTextarea
-          value={text}
-          onChange={setText}
-          placeholder="Paste your story here…"
-          minHeight={220}
-          ariaLabel="Your story"
-        />
+        <div className="qs-markwrap">
+          {!text && !file ? <span className="qs-markwrap__ico" aria-hidden="true"><QSIcoBlurb name="feather" size={120} /></span> : null}
+          <ScriptTextarea
+            value={text}
+            onChange={setText}
+            placeholder="Paste your story here…"
+            minHeight={220}
+            ariaLabel="Your story"
+          />
+        </div>
         <div className="qs-or"><span>or</span></div>
 
         <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={QS_HIDDEN_INPUT} tabIndex={-1} />
@@ -209,18 +288,56 @@ function Blurb() {
 
       <div className="qs-step">
         <p className="qs-steplabel">How should it sound? <Tooltip text="Warm: friendly and personal. Literary: elevated, evocative prose. Punchy: short lines, fast hooks. Mysterious: intriguing, holds a little back." /></p>
-        <div className="qs-pills">
+        <div className="qs-tonecards">
           {QS_TONES.map((t) => (
             <button
               key={t.id}
               type="button"
-              className={`qs-pill${tone === t.id ? ' qs-pill--on' : ''}`}
+              className={`qs-tonecard${tone === t.id ? ' qs-tonecard--on' : ''}`}
               onClick={() => setTone(t.id)}
               aria-pressed={tone === t.id}
-            >{t.label}</button>
+            >
+              <span className="qs-tonecard__label">{t.label}</span>
+              <p className="qs-tonecard__eg">{t.eg}</p>
+            </button>
           ))}
         </div>
       </div>
+
+      <div className="qs-step">
+        <p className="qs-steplabel">How much of it?</p>
+        <div className="qs-pills" role="radiogroup" aria-label="Blurb length">
+          {QS_LENGTHS.map((l) => (
+            <button key={l.id} type="button" role="radio" aria-checked={length === l.id}
+              className={`qs-pill${length === l.id ? ' qs-pill--on' : ''}`}
+              onClick={() => setLength(l.id)}>{l.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {kept.length ? (
+        <div className="qs-step">
+          <p className="qs-steplabel">Kept blurbs</p>
+          <div className="qs-kept">
+            {kept.map((k) => (
+              <div className="qs-keptrow" key={k.id}>
+                <p className="qs-keptrow__line">{k.back_cover}</p>
+                <span className="qs-keptrow__meta">{k.tone} · {new Date(k.ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                <button type="button" className="qs-payoff__again" onClick={() => {
+                  setResult({ back_cover: k.back_cover, back_cover_variants: [k.back_cover], taglines: k.taglines || [], keywords: k.keywords || [], short_description: k.short_description, query_paragraph: k.query_paragraph, comps: k.comps || [] });
+                  setComps(k.comps || []); setTone(k.tone); setTake(0); setJustKept(false); setGroundedBy(null); setPhase('done');
+                }}>Open</button>
+                <button type="button" className="qs-payoff__again" aria-label="Remove kept blurb" onClick={() => {
+                  const next = kept.filter((x) => x.id !== k.id);
+                  setKept(next); saveKeptBlurbs(next);
+                }}>
+                  <QSIcoBlurb name="x" size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="qs-actionrow">
         <QSBtnBlurb size="lg" icon="sparkles" onClick={find}>Find my words</QSBtnBlurb>
