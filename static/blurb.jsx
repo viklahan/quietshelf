@@ -234,8 +234,14 @@ function Blurb() {
           </RCard>
         </div>
         <div className="qs-actionrow">
+          <button type="button" className="qs-payoff__again" onClick={() => {
+            setPhase('compose'); setText(''); setFile(null); setResult(null);
+            setGroundedBy(null); if (fileRef.current) fileRef.current.value = '';
+          }}>
+            <QSIcoBlurb name="rotate-ccw" size={13} />New piece
+          </button>
           <button type="button" className="qs-payoff__again" onClick={() => setPhase('compose')}>
-            <QSIcoBlurb name="rotate-ccw" size={13} />Try a different tone
+            <QSIcoBlurb name="refresh-cw" size={13} />Try a different tone
           </button>
         </div>
       </div>
