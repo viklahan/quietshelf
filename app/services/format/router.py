@@ -107,7 +107,9 @@ async def format_manuscript(
     request: Request,
     file: UploadFile = File(...),
     title: str = Form(...),
-    author: str = Form(...),
+    # Default instead of required: FastAPI turns an empty form value for a
+    # required field into a 422; an empty author should fall back, not fail.
+    author: str = Form(""),
     theme: Theme = Form(...),
     cover_image: UploadFile | None = File(None),
     # Generated-cover look; plain strings on purpose - unknown values fall
@@ -117,6 +119,7 @@ async def format_manuscript(
     _: None = Depends(guard),
 ):
     get_theme(theme)  # validates enum membership
+    author = author.strip() or "Unknown Author"
 
     raw = await file.read()
     max_bytes = config.max_upload_mb() * 1024 * 1024

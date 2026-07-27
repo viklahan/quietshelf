@@ -437,6 +437,14 @@ function StoryMapPage() {
   const fileRef = React.useRef(null);
   const mapFileRef = React.useRef(null);
 
+  /* When the drawer opens, move focus to its close button (keyboard users
+     land inside the panel; Escape closes it from anywhere within). */
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const el = document.querySelector('.qs-smdrawer__x');
+    if (el) el.focus();
+  }, [selectedId]);
+
   const words = countWordsSm(text);
 
   function onPick(e) {
@@ -732,25 +740,40 @@ function StoryMapPage() {
             {(() => {
               const sel = cast.find((c, i) => qsCharId(c, i) === selectedId);
               if (!sel) return null;
-              if (editingChar) {
-                return (
-                  <EditCharacterPanel
-                    key={selectedId}
-                    ch={sel}
-                    onSave={(patch) => applyCharEdit(selectedId, patch)}
-                    onCancel={() => setEditingChar(false)}
-                  />
-                );
-              }
+              const closeDrawer = () => { setEditingChar(false); setSelectedId(null); };
               return (
-                <div style={{ marginTop: 'var(--space-6)' }}>
-                  <CharacterCard ch={sel} names={names} imagined={imagined} />
-                  <div className="qs-actionrow">
-                    <button type="button" className="qs-payoff__again" onClick={() => setEditingChar(true)}>
-                      Edit this character
+                <aside
+                  className="qs-smdrawer"
+                  role="complementary"
+                  aria-label={`${sel.name} — character profile`}
+                  onKeyDown={(e) => { if (e.key === 'Escape') closeDrawer(); }}
+                >
+                  <div className="qs-smdrawer__head">
+                    <h3 className="qs-smdrawer__name">{sel.name}</h3>
+                    <button type="button" className="qs-smdrawer__x" aria-label="Close character panel" onClick={closeDrawer}>
+                      <QSIcoSmap name="x" size={15} />
                     </button>
                   </div>
-                </div>
+                  <div className="qs-smdrawer__body">
+                    {editingChar ? (
+                      <EditCharacterPanel
+                        key={selectedId}
+                        ch={sel}
+                        onSave={(patch) => applyCharEdit(selectedId, patch)}
+                        onCancel={() => setEditingChar(false)}
+                      />
+                    ) : (
+                      <>
+                        <CharacterCard ch={sel} names={names} imagined={imagined} />
+                        <div className="qs-actionrow">
+                          <button type="button" className="qs-payoff__again" onClick={() => setEditingChar(true)}>
+                            Edit this character
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </aside>
               );
             })()}
           </>
@@ -800,13 +823,16 @@ function StoryMapPage() {
       <p className="qs-lead">Who’s in your story? I’ll map the people and how they connect — only what’s on the page.</p>
 
       <div className="qs-step">
-        <QSSmapTA
-          value={text}
-          onChange={setText}
-          placeholder="Paste your story here…"
-          minHeight={220}
-          ariaLabel="Your story"
-        />
+        <div className="qs-markwrap">
+          {!text && !file ? <span className="qs-markwrap__ico" aria-hidden="true"><QSIcoSmap name="search" size={120} /></span> : null}
+          <QSSmapTA
+            value={text}
+            onChange={setText}
+            placeholder="Paste your story here…"
+            minHeight={220}
+            ariaLabel="Your story"
+          />
+        </div>
         <div className="qs-or"><span>or</span></div>
 
         <input ref={fileRef} type="file" accept=".docx,.rtf,.txt" onChange={onPick} style={QS_SM_HIDDEN_INPUT} tabIndex={-1} />

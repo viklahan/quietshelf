@@ -331,13 +331,16 @@ function Promote() {
   return (
     <div className="qs-page">
       <p className="qs-lead">Paste your writing. I'll map it into a calm shot-by-shot video plan.</p>
-      <QSScriptTA
-        value={text}
-        onChange={setText}
-        placeholder="Paste your writing here…"
-        minHeight={260}
-        ariaLabel="Your writing"
-      />
+      <div className="qs-markwrap">
+        {!text ? <span className="qs-markwrap__ico" aria-hidden="true"><QSIcoPromo name="film" size={120} /></span> : null}
+        <QSScriptTA
+          value={text}
+          onChange={setText}
+          placeholder="Paste your writing here…"
+          minHeight={260}
+          ariaLabel="Your writing"
+        />
+      </div>
       <div className="qs-meter">
         <span><strong>{words.toLocaleString()}</strong> words</span>
         <span aria-hidden="true">{'\u00b7'}</span>

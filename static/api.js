@@ -57,13 +57,16 @@
   }
 
   // POST /api/format (multipart) -> { blob, filename } for the .epub
-  async function formatBook({ file, title, author, theme, cover }) {
+  async function formatBook({ file, title, author, theme, cover, coverStyle, coverAccent }) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('title', title);
     fd.append('author', author);
     fd.append('theme', theme);
     if (cover) fd.append('cover_image', cover);
+    // Generated-cover options (used only when no cover_image; see BACKEND_HANDOFF.md)
+    if (!cover && coverStyle) fd.append('cover_style', coverStyle);
+    if (!cover && coverAccent) fd.append('cover_accent', coverAccent);
 
     const resp = await fetch(BASE + '/api/format', { method: 'POST', body: fd });
     if (!resp.ok) {

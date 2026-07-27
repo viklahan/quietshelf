@@ -78,10 +78,11 @@ _CHAPTER_RE = re.compile(
         (?:[IVXLCDM]+|\d+|[a-z]+)
         (?:[:\s].*)?
       |
-        # standalone structural words
+        # standalone structural words; a subtitle only after a colon —
+        # a bare space would swallow prose like "Prologue prose."
         (?:prologue|epilogue|introduction|preface|afterword
            |interlude|coda|foreword|acknowledgements?|dedication)
-        (?:[:\s].*)?
+        (?::.*)?
     )
     $
     ''',

@@ -129,6 +129,264 @@ function PhotoCard({ photo, selected, onSelect }) {
   );
 }
 
+/* ── The payoff: one book on the shelf. Click it, it opens. ─────────
+   PayoffBook: the closed book (3D, hinged cover, hover cracks it open).
+   OpenBook: the book open on the desk — real EPUB pages via epub.js,
+   or a graceful typeset "peek" spread when the epub can't render.
+   BookExperience: the state machine (closed → opening → open → closing).
+   Self-contained: all styles live in QS_PAYOFF_CSS, injected once. */
+
+const QS_PAYOFF_CSS = `
+.qs-pay-announce{font-family:var(--font-display);font-style:italic;font-size:clamp(1.7rem,4vw,2.3rem);color:var(--ember-400);margin:0 0 6px;line-height:1.2;text-align:center;animation:qs-pay-fade 700ms var(--ease-quiet) both}
+.qs-pay-sub{font-family:var(--font-body);font-style:italic;font-size:.95rem;color:var(--text-faint);text-align:center;margin:0 0 var(--space-8);animation:qs-pay-fade 700ms var(--ease-quiet) 250ms both}
+.qs-pay-reveal{animation:qs-pay-fade 800ms var(--ease-quiet) 450ms both}
+.qs-pay-back{animation:qs-pay-fade 400ms var(--ease-quiet) both}
+.qs-pay-back .qs-pb{animation-delay:0ms}
+.qs-pay-actions{animation:qs-pay-fade 700ms var(--ease-quiet) 1050ms both}
+@keyframes qs-pay-fade{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+.qs-pay-hint{text-align:center;margin:var(--space-3) 0 0;font-family:var(--font-body);font-style:italic;font-size:var(--fs-small,0.9rem);color:var(--text-faint);animation:qs-pay-fade 600ms var(--ease-quiet) 1200ms both}
+.qs-pb-stage{display:flex;align-items:flex-end;justify-content:center;min-height:330px;perspective:1500px;position:relative;z-index:2}
+.qs-pb{position:relative;width:200px;height:292px;transform-style:preserve-3d;border:0;background:none;padding:0;cursor:pointer;transform:rotateX(4deg) rotateY(-22deg);transition:transform 600ms var(--ease-quiet);animation:qs-pb-settle 1100ms var(--ease-settle) 500ms backwards}
+@keyframes qs-pb-settle{0%{opacity:0;transform:translateY(-46px) rotateX(4deg) rotateY(-22deg)}100%{opacity:1;transform:translateY(0) rotateX(4deg) rotateY(-22deg)}}
+.qs-pb:hover,.qs-pb:focus-visible{transform:rotateX(2deg) rotateY(-14deg) translateY(-4px);outline:none}
+.qs-pb--opening,.qs-pb--opening:hover{transform:rotateX(0deg) rotateY(-4deg) translateY(-2px) scale(1.03)}
+.qs-pb__cover{position:absolute;inset:0;transform-origin:left center;transform-style:preserve-3d;transition:transform 680ms cubic-bezier(.3,.05,.2,1);display:block}
+.qs-pb:hover .qs-pb__cover,.qs-pb:focus-visible .qs-pb__cover{transform:rotateY(-28deg)}
+.qs-pb--opening .qs-pb__cover,.qs-pb--opening:hover .qs-pb__cover{transform:rotateY(-160deg)}
+.qs-pb__front{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:2px 5px 5px 2px;border:1px solid var(--edge-strong);box-shadow:var(--shadow-inset-paper),10px 16px 36px rgba(0,0,0,.42);overflow:hidden;display:flex;flex-direction:column;padding:24px 20px 20px;text-align:left}
+.qs-pb__facefill{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:var(--shadow-inset-paper),10px 16px 36px rgba(0,0,0,.42)}
+.qs-pb__front--img{background-size:cover;background-position:center;padding:18px 14px 14px}
+.qs-pb__rule{display:block;width:32px;height:2px;margin-bottom:16px}
+.qs-pb__title{display:block;font-family:var(--font-display);font-weight:var(--fw-display,500);font-size:1.3rem;line-height:1.16;margin:0;text-wrap:balance}
+.qs-pb__author{display:block;margin-top:auto;font-family:var(--font-mono);font-size:.66rem;letter-spacing:var(--ls-meta,0.08em);text-transform:uppercase}
+.qs-pb__ptitle{display:block;font-family:var(--font-display);font-size:1.15rem;line-height:1.18;color:#fff;text-shadow:0 1px 10px rgba(0,0,0,.75);text-align:center;margin:6px 0 auto;text-wrap:balance}
+.qs-pb__pauthor{display:block;margin-top:auto;text-align:center;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.92);text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.qs-pb__back{position:absolute;inset:0;transform:rotateY(180deg);backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:5px 2px 2px 5px;background:linear-gradient(105deg,#241d15,#1c1710);border:1px solid var(--edge-soft);display:block;opacity:0}
+.qs-pb--opening .qs-pb__cover>span:first-child{opacity:0;transition:opacity 0ms 340ms}
+.qs-pb--opening .qs-pb__back{opacity:1;transition:opacity 0ms 300ms}
+.qs-pb__sheet{position:absolute;inset:3px 2px 3px 8px;background:linear-gradient(100deg,#efe8da,#e2d9c6);border-radius:2px 4px 4px 2px;display:flex;align-items:center;justify-content:center;padding:18px}
+.qs-pb__sheet-t{font-family:var(--font-display);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:#6b6153;text-align:center;text-wrap:balance}
+.qs-pb__spine{position:absolute;top:0;left:0;width:30px;height:100%;background:var(--ink-800);border-radius:2px 0 0 2px;transform-origin:left center;transform:rotateY(-90deg) translateX(-15px);border:1px solid var(--edge-soft);display:flex;align-items:center;justify-content:center}
+.qs-pb__spine span{writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--font-display);font-size:.66rem;color:var(--text-faint);white-space:nowrap;letter-spacing:.04em;max-height:92%;overflow:hidden}
+.qs-pb__pages{position:absolute;top:3px;bottom:3px;right:0;width:12px;transform-origin:right center;transform:rotateY(90deg) translateX(6px);background:repeating-linear-gradient(to right,var(--paper-600) 0 1px,var(--ink-700) 1px 2px);border-radius:0 2px 2px 0;display:block}
+.qs-ob{margin:var(--space-6) auto 0;max-width:760px;animation:qs-ob-in 340ms var(--ease-quiet)}
+@keyframes qs-ob-in{0%{opacity:0;transform:translateY(16px) scale(.955)}100%{opacity:1;transform:none}}
+.qs-ob--closing{animation:qs-ob-out 260ms var(--ease-quiet) both}
+@keyframes qs-ob-out{to{opacity:0;transform:translateY(14px) scale(.955)}}
+.qs-ob__board{position:relative;background:linear-gradient(160deg,#2b2218,#1f1912 60%,#191410);border:1px solid var(--edge-strong);border-radius:10px;padding:12px 12px 16px;box-shadow:0 30px 60px -20px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.35)}
+.qs-ob__pages{position:relative;height:470px;background:linear-gradient(180deg,#f6f1e6,#efe8d8);border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -12px 26px rgba(120,100,70,.16)}
+.qs-ob__pages::before,.qs-ob__pages::after{content:"";position:absolute;top:0;bottom:0;width:9px;z-index:2;pointer-events:none}
+.qs-ob__pages::before{left:0;background:repeating-linear-gradient(to right,rgba(120,100,70,.28) 0 1px,rgba(255,255,255,.5) 1px 3px)}
+.qs-ob__pages::after{right:0;background:repeating-linear-gradient(to left,rgba(120,100,70,.28) 0 1px,rgba(255,255,255,.5) 1px 3px)}
+.qs-ob__gutter{position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(90deg,transparent 43%,rgba(60,45,25,.13) 49.5%,rgba(60,45,25,.22) 50%,rgba(60,45,25,.13) 50.5%,transparent 57%)}
+.qs-ob__holder{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;transition:opacity 300ms var(--ease-quiet)}
+.qs-ob__wait{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;color:#8a7c62;font-family:var(--font-body);font-style:italic;font-size:.9rem}
+.qs-ob__emberdot{width:9px;height:9px;border-radius:50%;background:var(--ember-500);box-shadow:0 0 18px 4px rgba(217,164,88,.45);animation:qs-ob-pulse 2600ms ease-in-out infinite}
+@keyframes qs-ob-pulse{0%,100%{opacity:.55;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+.qs-ob__peek{position:absolute;inset:0;z-index:1;display:grid;grid-template-columns:1fr 1fr}
+.qs-ob__pg{padding:46px 42px 34px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-width:0}
+.qs-ob__pg--l h3{font-family:var(--font-display);font-weight:var(--fw-display,500);font-size:1.5rem;line-height:1.22;margin:16px 0 12px;color:#2c2519;text-wrap:balance}
+.qs-ob__halfrule{display:block;width:34px;height:2px;background:#8a6f3f}
+.qs-ob__by{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#7a6c52}
+.qs-ob__opening{font-family:var(--font-body);font-size:.95rem;line-height:1.78;color:#3a3226;margin:16px 0 0;max-width:36ch;text-align:left}
+.qs-ob__opening::first-letter{font-family:var(--font-display);font-size:2.7em;float:left;line-height:.78;padding:5px 8px 0 0;color:#2c2519}
+.qs-ob__note{font-family:var(--font-body);font-style:italic;font-size:.78rem;color:#8a7c62;margin:auto 0 0}
+.qs-ob__turn{position:absolute;top:0;bottom:0;width:64px;border:0;background:none;cursor:pointer;z-index:4;color:transparent;font-family:var(--font-display);font-size:1.7rem;line-height:1;transition:color .2s var(--ease-quiet)}
+.qs-ob__turn--l{left:0;border-radius:4px 0 0 4px}
+.qs-ob__turn--r{right:0;border-radius:0 4px 4px 0}
+.qs-ob__turn--l:hover{color:#5d4e35;background:linear-gradient(to right,rgba(120,95,55,.09),transparent)}
+.qs-ob__turn--r:hover{color:#5d4e35;background:linear-gradient(to left,rgba(120,95,55,.09),transparent)}
+.qs-ob__row{display:flex;align-items:center;justify-content:center;gap:var(--space-6);margin-top:var(--space-4)}
+.qs-ob__row .qs-payoff__again{white-space:nowrap}
+.qs-ob__pgnum{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.1em;color:var(--text-faint);min-width:64px;text-align:center}
+@media (max-width:720px){.qs-ob__pages{height:420px}.qs-ob__pg{padding:30px 22px 24px}}
+@media (prefers-reduced-motion:reduce){.qs-pb,.qs-pb__cover,.qs-ob,.qs-pay-announce,.qs-pay-sub,.qs-pay-reveal,.qs-pay-back,.qs-pay-actions,.qs-pay-hint{animation:none!important;transition:none!important}}
+`;
+
+/* The finished book, closed, standing on the shelf. A real object: cover,
+   spine, page block, and a half-title sheet you glimpse as the cover opens. */
+function PayoffBook({ title, author, coverUrl, bg, ink, opening, onOpen, front }) {
+  const themed = !!bg && !coverUrl;
+  return (
+    <div className="qs-pb-stage">
+      <button
+        type="button"
+        className={`qs-pb${opening ? ' qs-pb--opening' : ''}`}
+        onClick={onOpen}
+        aria-label={`Open ${title} and look inside`}
+        title="Look inside"
+      >
+        <span className="qs-pb__pages" aria-hidden="true"></span>
+        <span className="qs-pb__spine" aria-hidden="true" style={themed ? { background: bg } : undefined}>
+          <span style={themed ? { color: ink } : undefined}>{title}</span>
+        </span>
+        <span className="qs-pb__sheet" aria-hidden="true">
+          <span className="qs-pb__sheet-t">{title}</span>
+        </span>
+        <span className="qs-pb__cover" aria-hidden="true">
+          {front || (coverUrl ? (
+            <span className="qs-pb__front qs-pb__front--img" style={{ backgroundImage: `url(${coverUrl})` }}>
+              <span className="qs-pb__ptitle">{title}</span>
+              {author ? <span className="qs-pb__pauthor">{author}</span> : null}
+            </span>
+          ) : (
+            <span className="qs-pb__front" style={{ background: bg || 'var(--ink-700)' }}>
+              <span className="qs-pb__rule" style={{ background: ink || 'var(--ember-500)' }}></span>
+              <span className="qs-pb__title" style={{ color: ink || 'var(--text-body)' }}>{title}</span>
+              {author ? <span className="qs-pb__author" style={{ color: ink || 'var(--text-muted)' }}>{author}</span> : null}
+            </span>
+          ))}
+          <span className="qs-pb__back" aria-hidden="true"></span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/* The book, open on the desk. Renders the actual EPUB (epub.js, two facing
+   pages) when it can; otherwise a quiet typeset peek of the opening. */
+function OpenBook({ blob, title, author, sample, closing, onClose }) {
+  const PAGE_H = 470;
+  const pagesRef = React.useRef(null);
+  const holderRef = React.useRef(null);
+  const bookRef = React.useRef(null);
+  const rendRef = React.useRef(null);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  const [mode, setMode] = React.useState('loading'); // loading | epub | peek
+  const [pg, setPg] = React.useState(null);
+
+  React.useEffect(() => {
+    let dead = false;
+    if (!blob || typeof ePub === 'undefined') { setMode('peek'); return undefined; }
+    blob.arrayBuffer().then((buf) => {
+      if (dead || !holderRef.current) return;
+      const book = ePub(buf);
+      bookRef.current = book;
+      const w = Math.max(320, Math.floor((pagesRef.current ? pagesRef.current.clientWidth : 640) / 2) * 2);
+      const rendition = book.renderTo(holderRef.current, {
+        width: w, height: PAGE_H, flow: 'paginated', spread: 'always', minSpreadWidth: 0, gap: 56,
+      });
+      rendRef.current = rendition;
+      rendition.on('relocated', (loc) => {
+        if (dead) return;
+        setMode('epub');
+        try { setPg({ page: loc.start.displayed.page, total: loc.start.displayed.total }); } catch (e) {}
+      });
+      rendition.on('keydown', (e) => {
+        if (e.key === 'ArrowRight') { try { rendition.next(); } catch (err) {} }
+        else if (e.key === 'ArrowLeft') { try { rendition.prev(); } catch (err) {} }
+        else if (e.key === 'Escape') onCloseRef.current();
+      });
+      book.ready.then(() => {
+        const items = book.spine && book.spine.items;
+        const startHref = items && items.length > 1 ? items[1].href : undefined;
+        return rendition.display(startHref);
+      }).catch(() => rendition.display());
+    }).catch(() => { if (!dead) setMode('peek'); });
+    return () => { dead = true; try { if (bookRef.current) bookRef.current.destroy(); } catch (e) {} };
+  }, [blob]);
+
+  // If the epub never settles, fall back to the peek rather than spin forever.
+  React.useEffect(() => {
+    if (mode !== 'loading') return undefined;
+    const t = setTimeout(() => setMode((m) => (m === 'loading' ? 'peek' : m)), 6000);
+    return () => clearTimeout(t);
+  }, [mode]);
+
+  const canTurn = mode === 'epub';
+  function prev() { try { if (rendRef.current) rendRef.current.prev(); } catch (e) {} }
+  function next() { try { if (rendRef.current) rendRef.current.next(); } catch (e) {} }
+
+  React.useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onCloseRef.current();
+      else if (e.key === 'ArrowLeft' && canTurn) prev();
+      else if (e.key === 'ArrowRight' && canTurn) next();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  return (
+    <div className={`qs-ob${closing ? ' qs-ob--closing' : ''}`}>
+      <div className="qs-ob__board">
+        <div className="qs-ob__pages" ref={pagesRef} role="region" aria-label={`Inside ${title}`}>
+          {mode !== 'peek' && (
+            <div ref={holderRef} className="qs-ob__holder" style={{ opacity: canTurn ? 1 : 0 }}></div>
+          )}
+          {mode === 'peek' && (
+            <div className="qs-ob__peek">
+              <div className="qs-ob__pg qs-ob__pg--l">
+                <span className="qs-ob__halfrule" aria-hidden="true"></span>
+                <h3>{title}</h3>
+                {author ? <span className="qs-ob__by">by {author}</span> : null}
+              </div>
+              <div className="qs-ob__pg qs-ob__pg--r">
+                {sample ? <p className="qs-ob__opening">{sample}</p> : null}
+                <p className="qs-ob__note">Your words, exactly as you set them — the full book is in the download.</p>
+              </div>
+            </div>
+          )}
+          {mode === 'loading' && (
+            <div className="qs-ob__wait">
+              <span className="qs-ob__emberdot" aria-hidden="true"></span>
+              <span>Opening your book…</span>
+            </div>
+          )}
+          <div className="qs-ob__gutter" aria-hidden="true"></div>
+          {canTurn && (
+            <React.Fragment>
+              <button type="button" className="qs-ob__turn qs-ob__turn--l" onClick={prev} aria-label="Previous page">‹</button>
+              <button type="button" className="qs-ob__turn qs-ob__turn--r" onClick={next} aria-label="Next page">›</button>
+            </React.Fragment>
+          )}
+        </div>
+      </div>
+      <div className="qs-ob__row">
+        <span className="qs-ob__pgnum">{canTurn && pg ? `${pg.page} · ${pg.total}` : '\u00a0'}</span>
+        <button type="button" className="qs-payoff__again" onClick={onClose}>Close the book</button>
+      </div>
+    </div>
+  );
+}
+
+/* closed → opening (cover swings) → open (reading) → closing → closed */
+function BookExperience({ blob, title, author, coverUrl, bg, ink, sample, front }) {
+  const { Shelf } = window;
+  const [stage, setStage] = React.useState('closed');
+  const [returned, setReturned] = React.useState(false);
+  const t = React.useRef(null);
+  React.useEffect(() => () => clearTimeout(t.current), []);
+  function open() {
+    if (stage !== 'closed') return;
+    setStage('opening');
+    t.current = setTimeout(() => setStage('open'), 720);
+  }
+  function close() {
+    if (stage !== 'open') return;
+    setStage('closing');
+    t.current = setTimeout(() => { setStage('closed'); setReturned(true); }, 280);
+  }
+  if (stage === 'open' || stage === 'closing') {
+    return (
+      <OpenBook blob={blob} title={title} author={author} sample={sample}
+        closing={stage === 'closing'} onClose={close} />
+    );
+  }
+  return (
+    <div className={returned ? 'qs-pay-back' : 'qs-pay-reveal'}>
+      <div className="qs-shelfwrap qs-shelfwrap--lg">
+        <Shelf lit={true}>
+          <PayoffBook title={title} author={author} coverUrl={coverUrl} bg={bg} ink={ink}
+            opening={stage === 'opening'} onOpen={open} front={front} />
+        </Shelf>
+      </div>
+      <p className="qs-pay-hint">Click the book to look inside.</p>
+    </div>
+  );
+}
+
 function Format() {
   const { Shelf, FinishedBook, Becoming, StepLabel, Tooltip } = window;
 
@@ -286,65 +544,20 @@ function Format() {
     const displayCover = coverPreviewUrl || photoPreviewUrl;
     const bookTitle = title || 'Your book';
     const bookAuthor = author || '';
+    const pal = QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic;
+    const sample = (QS_THEME_PREVIEWS[theme] || QS_THEME_PREVIEWS.classic).sample;
     return (
       <div className="qs-page qs-page--narrow qs-payoff">
-
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
-          <p style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
-            color: 'var(--ember-400)',
-            margin: '0 0 var(--space-3)',
-            lineHeight: 1.2,
-          }}>
-            It's your book now.
-          </p>
-          <p style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
-            color: 'var(--text-body)',
-            margin: '0 0 var(--space-2)',
-          }}>
-            {bookTitle}
-          </p>
-          {bookAuthor ? (
-            <p style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 'var(--fs-small)',
-              color: 'var(--text-faint)',
-              margin: '0 0 var(--space-4)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}>
-              by {bookAuthor}
-            </p>
-          ) : null}
-          <p style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 'var(--fs-body)',
-            color: 'var(--text-muted)',
-            fontStyle: 'italic',
-            margin: 0,
-          }}>
-            Enjoy.
-          </p>
-        </div>
-
-        <div className="qs-shelfwrap qs-shelfwrap--lg" style={{ marginBottom: 'var(--space-8)' }}>
-          <Shelf lit={true}>
-            <FinishedBook
-              title={bookTitle}
-              author={bookAuthor}
-              coverUrl={displayCover}
-              bg={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).bg}
-              ink={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).ink}
-            />
-          </Shelf>
-        </div>
-
-        <div className="qs-payoff__action">
+        <style>{QS_PAYOFF_CSS}</style>
+        <p className="qs-pay-announce">It’s your book now.</p>
+        <p className="qs-pay-sub">{bookTitle}{bookAuthor ? ` — by ${bookAuthor}` : ''}. Bound and ready.</p>
+        <BookExperience
+          blob={result && result.blob}
+          title={bookTitle} author={bookAuthor}
+          coverUrl={displayCover} bg={pal.bg} ink={pal.ink}
+          sample={sample}
+        />
+        <div className="qs-payoff__action qs-pay-actions">
           <QSButton size="lg" icon="book-open" onClick={download}>Download your ebook</QSButton>
           <button type="button" className="qs-payoff__again" onClick={reset}>
             <QSIcon name="rotate-ccw" size={13} />Format another
@@ -439,9 +652,22 @@ function Format() {
           )}
 
           {suggestionsLoading && (
-            <p className="qs-quiethint" style={{ marginBottom: 'var(--space-4)', fontStyle: 'italic' }}>
-              Reading your story and finding photos\u2026
-            </p>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-5) var(--space-6)',
+              marginBottom: 'var(--space-4)',
+              border: '1px solid var(--edge-soft)',
+              borderRadius: 'var(--radius-xs)',
+              color: 'var(--text-faint)',
+              fontFamily: 'var(--font-body)',
+              fontStyle: 'italic',
+              fontSize: 'var(--fs-small)',
+            }}>
+              <QSIcon name="sparkles" size={15} style={{ color: 'var(--ember-400)', flexShrink: 0 }} />
+              Reading your story and finding atmospheric photos…
+            </div>
           )}
 
           {suggestions.length > 0 && (

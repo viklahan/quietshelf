@@ -117,49 +117,29 @@ function Spine({ title, height = 118, tone }) {
 }
 
 /* The finished book — front cover, spine, page edges. The payoff.
-   coverUrl (a real uploaded image) takes priority; otherwise bg/ink let the
-   caller match the ACTUAL theme colors instead of a generic dark mockup.
-   All three are optional so existing callers (e.g. Home's decorative use)
-   keep working unchanged. */
-function FinishedBook({ title, author, coverUrl, bg, ink }) {
-  if (coverUrl) {
-    return (
-      <div className="qs-bookstage">
-        <div className="qs-book" role="img" aria-label={`${title} by ${author}, a finished ebook`}>
-          <div className="qs-book__pages" aria-hidden="true"></div>
-          <div className="qs-book__spine" aria-hidden="true"><span>{title}</span></div>
-          <div
-            className="qs-book__face"
-            style={{ backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          >
-            {author ? (
-              <span className="qs-book__author" style={{
-                position: 'absolute',
-                bottom: '12px',
-                left: 0, right: 0,
-                textAlign: 'center',
-                color: 'rgba(255,255,255,0.9)',
-                textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-                fontSize: '0.6rem',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-              }}>{author}</span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
+   coverUrl (a real uploaded image) takes priority; otherwise bg/ink/face let
+   the caller match the ACTUAL theme cover — its palette AND its typography.
+   All optional so existing callers (e.g. Home's decorative use) keep working. */
+function FinishedBook({ title, author, coverUrl, bg, ink, face, coverStyle, accent }) {
+  const themed = !!bg && !coverUrl;
+  const light = themed || !!coverUrl;
+  const vars = themed ? { '--cov-bg': bg, '--cov-ink': ink, '--cov-accent': accent || ink } : undefined;
   return (
     <div className="qs-bookstage">
       <div className="qs-book" role="img" aria-label={`${title} by ${author}, a finished ebook`}>
-        <div className="qs-book__pages" aria-hidden="true"></div>
-        <div className="qs-book__spine" aria-hidden="true"><span>{title}</span></div>
-        <div className="qs-book__face" style={bg ? { background: bg } : undefined}>
-          <div className="qs-book__rule" aria-hidden="true" style={ink ? { background: ink } : undefined}></div>
-          <h3 className="qs-book__title" style={ink ? { color: ink } : undefined}>{title}</h3>
-          <span className="qs-book__author" style={ink ? { color: ink } : undefined}>{author}</span>
+        <div className={`qs-book__pages${light ? ' qs-book__pages--themed' : ''}`} aria-hidden="true"></div>
+        <div className={`qs-book__spine${themed ? ' qs-book__spine--themed' : ''}`} aria-hidden="true" style={themed ? { background: bg } : undefined}>
+          <span style={themed ? { color: ink } : undefined}>{title}</span>
         </div>
+        {coverUrl ? (
+          <div className="qs-book__face qs-book__face--img" style={{ backgroundImage: `url(${coverUrl})` }}></div>
+        ) : (
+          <div className={`qs-book__face${themed ? ` qs-book__face--themed qs-book__face--${face || 'classic'} qs-book__face--st-${coverStyle || 'quiet'}` : ''}`} style={vars}>
+            <div className="qs-book__rule" aria-hidden="true"></div>
+            <h3 className="qs-book__title">{title}</h3>
+            <span className="qs-book__author">{author}</span>
+          </div>
+        )}
       </div>
     </div>
   );
