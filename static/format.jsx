@@ -145,8 +145,8 @@ const QS_PAYOFF_CSS = `
 .qs-pay-actions{animation:qs-pay-fade 700ms var(--ease-quiet) 1050ms both}
 @keyframes qs-pay-fade{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
 .qs-pay-hint{text-align:center;margin:var(--space-3) 0 0;font-family:var(--font-body);font-style:italic;font-size:var(--fs-small,0.9rem);color:var(--text-faint);animation:qs-pay-fade 600ms var(--ease-quiet) 1200ms both}
-.qs-pb-stage{display:flex;align-items:flex-end;justify-content:center;min-height:330px;perspective:1500px;position:relative;z-index:2}
-.qs-pb{position:relative;width:200px;height:292px;transform-style:preserve-3d;border:0;background:none;padding:0;cursor:pointer;transform:rotateX(4deg) rotateY(-22deg);transition:transform 600ms var(--ease-quiet);animation:qs-pb-settle 1100ms var(--ease-settle) 500ms backwards}
+.qs-pb-stage{display:flex;align-items:flex-end;justify-content:center;min-height:392px;perspective:1500px;position:relative;z-index:2}
+.qs-pb{position:relative;width:240px;height:350px;transform-style:preserve-3d;border:0;background:none;padding:0;cursor:pointer;transform:rotateX(4deg) rotateY(-22deg);transition:transform 600ms var(--ease-quiet);animation:qs-pb-settle 1100ms var(--ease-settle) 500ms backwards}
 @keyframes qs-pb-settle{0%{opacity:0;transform:translateY(-46px) rotateX(4deg) rotateY(-22deg)}100%{opacity:1;transform:translateY(0) rotateX(4deg) rotateY(-22deg)}}
 .qs-pb:hover,.qs-pb:focus-visible{transform:rotateX(2deg) rotateY(-14deg) translateY(-4px);outline:none}
 .qs-pb--opening,.qs-pb--opening:hover{transform:rotateX(0deg) rotateY(-4deg) translateY(-2px) scale(1.03)}
@@ -157,7 +157,7 @@ const QS_PAYOFF_CSS = `
 .qs-pb__facefill{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:var(--shadow-inset-paper),10px 16px 36px rgba(0,0,0,.42)}
 .qs-pb__front--img{background-size:cover;background-position:center;padding:18px 14px 14px}
 .qs-pb__rule{display:block;width:32px;height:2px;margin-bottom:16px}
-.qs-pb__title{display:block;font-family:var(--font-display);font-weight:var(--fw-display,500);font-size:1.3rem;line-height:1.16;margin:0;text-wrap:balance}
+.qs-pb__title{display:block;font-family:var(--font-display);font-weight:var(--fw-display,500);font-size:1.5rem;line-height:1.16;margin:0;text-wrap:balance}
 .qs-pb__author{display:block;margin-top:auto;font-family:var(--font-mono);font-size:.66rem;letter-spacing:var(--ls-meta,0.08em);text-transform:uppercase}
 .qs-pb__ptitle{display:block;font-family:var(--font-display);font-size:1.15rem;line-height:1.18;color:#fff;text-shadow:0 1px 10px rgba(0,0,0,.75);text-align:center;margin:6px 0 auto;text-wrap:balance}
 .qs-pb__pauthor{display:block;margin-top:auto;text-align:center;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.92);text-shadow:0 1px 6px rgba(0,0,0,.8)}
@@ -166,15 +166,15 @@ const QS_PAYOFF_CSS = `
 .qs-pb--opening .qs-pb__back{opacity:1;transition:opacity 0ms 300ms}
 .qs-pb__sheet{position:absolute;inset:3px 2px 3px 8px;background:linear-gradient(100deg,#efe8da,#e2d9c6);border-radius:2px 4px 4px 2px;display:flex;align-items:center;justify-content:center;padding:18px}
 .qs-pb__sheet-t{font-family:var(--font-display);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:#6b6153;text-align:center;text-wrap:balance}
-.qs-pb__spine{position:absolute;top:0;left:0;width:30px;height:100%;background:var(--ink-800);border-radius:2px 0 0 2px;transform-origin:left center;transform:rotateY(-90deg) translateX(-15px);border:1px solid var(--edge-soft);display:flex;align-items:center;justify-content:center}
+.qs-pb__spine{position:absolute;top:0;left:0;width:34px;height:100%;background:var(--ink-800);border-radius:2px 0 0 2px;transform-origin:left center;transform:rotateY(-90deg) translateX(-17px);border:1px solid var(--edge-soft);display:flex;align-items:center;justify-content:center}
 .qs-pb__spine span{writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--font-display);font-size:.66rem;color:var(--text-faint);white-space:nowrap;letter-spacing:.04em;max-height:92%;overflow:hidden}
-.qs-pb__pages{position:absolute;top:3px;bottom:3px;right:0;width:12px;transform-origin:right center;transform:rotateY(90deg) translateX(6px);background:repeating-linear-gradient(to right,var(--paper-600) 0 1px,var(--ink-700) 1px 2px);border-radius:0 2px 2px 0;display:block}
-.qs-ob{margin:var(--space-6) auto 0;max-width:760px;animation:qs-ob-in 340ms var(--ease-quiet)}
+.qs-pb__pages{position:absolute;top:3px;bottom:3px;right:0;width:14px;transform-origin:right center;transform:rotateY(90deg) translateX(7px);background:repeating-linear-gradient(to right,var(--paper-600) 0 1px,var(--ink-700) 1px 2px);border-radius:0 2px 2px 0;display:block}
+.qs-ob{margin:var(--space-6) auto 0;width:min(920px,94vw);margin-left:calc((100% - min(920px,94vw))/2);animation:qs-ob-in 340ms var(--ease-quiet)}
 @keyframes qs-ob-in{0%{opacity:0;transform:translateY(16px) scale(.955)}100%{opacity:1;transform:none}}
 .qs-ob--closing{animation:qs-ob-out 260ms var(--ease-quiet) both}
 @keyframes qs-ob-out{to{opacity:0;transform:translateY(14px) scale(.955)}}
 .qs-ob__board{position:relative;background:linear-gradient(160deg,#2b2218,#1f1912 60%,#191410);border:1px solid var(--edge-strong);border-radius:10px;padding:12px 12px 16px;box-shadow:0 30px 60px -20px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.35)}
-.qs-ob__pages{position:relative;height:470px;background:linear-gradient(180deg,#f6f1e6,#efe8d8);border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -12px 26px rgba(120,100,70,.16)}
+.qs-ob__pages{position:relative;height:560px;background:linear-gradient(180deg,#f6f1e6,#efe8d8);border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -12px 26px rgba(120,100,70,.16)}
 .qs-ob__pages::before,.qs-ob__pages::after{content:"";position:absolute;top:0;bottom:0;width:9px;z-index:2;pointer-events:none}
 .qs-ob__pages::before{left:0;background:repeating-linear-gradient(to right,rgba(120,100,70,.28) 0 1px,rgba(255,255,255,.5) 1px 3px)}
 .qs-ob__pages::after{right:0;background:repeating-linear-gradient(to left,rgba(120,100,70,.28) 0 1px,rgba(255,255,255,.5) 1px 3px)}
@@ -191,7 +191,7 @@ const QS_PAYOFF_CSS = `
 .qs-ob__opening{font-family:var(--font-body);font-size:.95rem;line-height:1.78;color:#3a3226;margin:16px 0 0;max-width:36ch;text-align:left}
 .qs-ob__opening::first-letter{font-family:var(--font-display);font-size:2.7em;float:left;line-height:.78;padding:5px 8px 0 0;color:#2c2519}
 .qs-ob__note{font-family:var(--font-body);font-style:italic;font-size:.78rem;color:#8a7c62;margin:auto 0 0}
-.qs-ob__turn{position:absolute;top:0;bottom:0;width:64px;border:0;background:none;cursor:pointer;z-index:4;color:transparent;font-family:var(--font-display);font-size:1.7rem;line-height:1;transition:color .2s var(--ease-quiet)}
+.qs-ob__turn{position:absolute;top:0;bottom:0;width:84px;border:0;background:none;cursor:pointer;z-index:4;color:rgba(93,78,53,.45);font-family:var(--font-display);font-size:2rem;line-height:1;transition:color .2s var(--ease-quiet)}
 .qs-ob__turn--l{left:0;border-radius:4px 0 0 4px}
 .qs-ob__turn--r{right:0;border-radius:0 4px 4px 0}
 .qs-ob__turn--l:hover{color:#5d4e35;background:linear-gradient(to right,rgba(120,95,55,.09),transparent)}
@@ -199,7 +199,7 @@ const QS_PAYOFF_CSS = `
 .qs-ob__row{display:flex;align-items:center;justify-content:center;gap:var(--space-6);margin-top:var(--space-4)}
 .qs-ob__row .qs-payoff__again{white-space:nowrap}
 .qs-ob__pgnum{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.1em;color:var(--text-faint);min-width:64px;text-align:center}
-@media (max-width:720px){.qs-ob__pages{height:420px}.qs-ob__pg{padding:30px 22px 24px}}
+@media (max-width:720px){.qs-ob__pages{height:470px}.qs-ob__pg{padding:30px 22px 24px}}
 @media (prefers-reduced-motion:reduce){.qs-pb,.qs-pb__cover,.qs-ob,.qs-pay-announce,.qs-pay-sub,.qs-pay-reveal,.qs-pay-back,.qs-pay-actions,.qs-pay-hint{animation:none!important;transition:none!important}}
 `;
 
@@ -246,7 +246,7 @@ function PayoffBook({ title, author, coverUrl, bg, ink, opening, onOpen, front }
 /* The book, open on the desk. Renders the actual EPUB (epub.js, two facing
    pages) when it can; otherwise a quiet typeset peek of the opening. */
 function OpenBook({ blob, title, author, sample, closing, onClose }) {
-  const PAGE_H = 470;
+  const PAGE_H = 560;
   const pagesRef = React.useRef(null);
   const holderRef = React.useRef(null);
   const bookRef = React.useRef(null);
@@ -271,18 +271,52 @@ function OpenBook({ blob, title, author, sample, closing, onClose }) {
       rendition.on('relocated', (loc) => {
         if (dead) return;
         setMode('epub');
-        try { setPg({ page: loc.start.displayed.page, total: loc.start.displayed.total }); } catch (e) {}
+        // Prefer the book-wide location counter (epub.js "locations") — the
+        // per-section displayed.page resets to 1 every chapter, which reads
+        // as a frozen counter when chapters are short.
+        try {
+          const locs = book.locations;
+          if (locs && locs.total) {
+            setPg({ page: Math.min(locs.total, (loc.start.location || 0) + 1), total: locs.total });
+          } else {
+            setPg({ page: loc.start.displayed.page, total: loc.start.displayed.total });
+          }
+        } catch (e) {}
       });
       rendition.on('keydown', (e) => {
         if (e.key === 'ArrowRight') { try { rendition.next(); } catch (err) {} }
         else if (e.key === 'ArrowLeft') { try { rendition.prev(); } catch (err) {} }
         else if (e.key === 'Escape') onCloseRef.current();
       });
+      // Clicks land inside the epub iframe, not on our turn zones — treat the
+      // outer fifths of the page itself as page turns, like a real book.
+      rendition.on('click', (e) => {
+        try {
+          const w = e.view ? e.view.innerWidth : 0;
+          if (!w) return;
+          const frac = e.clientX / w;
+          if (frac > 0.8) rendition.next();
+          else if (frac < 0.2) rendition.prev();
+        } catch (err) {}
+      });
       book.ready.then(() => {
         const items = book.spine && book.spine.items;
         const startHref = items && items.length > 1 ? items[1].href : undefined;
         return rendition.display(startHref);
-      }).catch(() => rendition.display());
+      }).catch(() => rendition.display())
+        // Build the book-wide page map, then refresh the counter for the
+        // spread already on screen. Failure just keeps the per-section count.
+        .then(() => book.locations.generate(900))
+        .then(() => {
+          if (dead) return;
+          try {
+            const loc = rendition.currentLocation();
+            if (loc && loc.start && book.locations.total) {
+              setPg({ page: Math.min(book.locations.total, (loc.start.location || 0) + 1), total: book.locations.total });
+            }
+          } catch (e) {}
+        })
+        .catch(() => {});
     }).catch(() => { if (!dead) setMode('peek'); });
     return () => { dead = true; try { if (bookRef.current) bookRef.current.destroy(); } catch (e) {} };
   }, [blob]);
