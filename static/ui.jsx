@@ -131,7 +131,21 @@ function FinishedBook({ title, author, coverUrl, bg, ink }) {
           <div
             className="qs-book__face"
             style={{ backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          ></div>
+          >
+            {author ? (
+              <span className="qs-book__author" style={{
+                position: 'absolute',
+                bottom: '12px',
+                left: 0, right: 0,
+                textAlign: 'center',
+                color: 'rgba(255,255,255,0.9)',
+                textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+                fontSize: '0.6rem',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}>{author}</span>
+            ) : null}
+          </div>
         </div>
       </div>
     );

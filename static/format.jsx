@@ -288,22 +288,23 @@ function Format() {
     const bookAuthor = author || '';
     return (
       <div className="qs-page qs-page--narrow qs-payoff">
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
           <p style={{
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
-            fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
+            fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
             color: 'var(--ember-400)',
-            margin: '0 0 var(--space-2)',
+            margin: '0 0 var(--space-3)',
             lineHeight: 1.2,
           }}>
-            It's a book now.
+            It's your book now.
           </p>
           <p style={{
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
-            fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
-            color: 'var(--text-muted)',
+            fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
+            color: 'var(--text-body)',
             margin: '0 0 var(--space-2)',
           }}>
             {bookTitle}
@@ -313,16 +314,25 @@ function Format() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--fs-small)',
               color: 'var(--text-faint)',
-              margin: 0,
+              margin: '0 0 var(--space-4)',
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
             }}>
               by {bookAuthor}
             </p>
           ) : null}
+          <p style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 'var(--fs-body)',
+            color: 'var(--text-muted)',
+            fontStyle: 'italic',
+            margin: 0,
+          }}>
+            Enjoy.
+          </p>
         </div>
 
-        <div className="qs-shelfwrap qs-shelfwrap--lg">
+        <div className="qs-shelfwrap qs-shelfwrap--lg" style={{ marginBottom: 'var(--space-8)' }}>
           <Shelf lit={true}>
             <FinishedBook
               title={bookTitle}
@@ -332,18 +342,6 @@ function Format() {
               ink={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).ink}
             />
           </Shelf>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
-          <p style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 'var(--fs-small)',
-            color: 'var(--text-faint)',
-            fontStyle: 'italic',
-            margin: '0 0 var(--space-6)',
-          }}>
-            Your story, made real.
-          </p>
         </div>
 
         <div className="qs-payoff__action">
