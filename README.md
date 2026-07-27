@@ -1,4 +1,5 @@
-# <img width="150" height="222" alt="logo-mark-small" src="https://github.com/user-attachments/assets/33759150-e3d4-4f91-b340-bc72bf5605fb" /> Quiet Shelf
+
+- **Format** — turn a manuscript (DOCX/RTF/TXT) into a beautiful, themed EPUB. No AI at all.<img width="320" height="320" alt="SpineQSLogo" src="https://github.com/user-attachments/assets/5719e906-952a-4f62-8097-16e5e97f5054" />
 
 Hand over the hard part. Quiet Shelf takes a writer's manuscript and quietly
 returns finished, sellable, promotable things — your story, on the shelf. It's
@@ -7,7 +8,6 @@ billing, no paid AI keys.
 
 ## Four services
 
-- **Format** — turn a manuscript (DOCX/RTF/TXT) into a beautiful, themed EPUB. No AI at all.
 - **Blurb** — turn a manuscript into back-cover copy, taglines, and store keywords.
 - **Promote** — turn a written piece into a stock-footage shot list for a promo video.
 - **Story Map** — turn a manuscript into a character/relationship map. A *mirror*:
