@@ -1,5 +1,5 @@
+<img width="860" height="752" alt="logo-mark" src="https://github.com/user-attachments/assets/ad111b08-4df7-46d5-9c5d-6b8b9ab5e56a" />
 
-<img width="320" height="320" alt="logo-mark" src="https://github.com/user-attachments/assets/26a59302-6204-49de-b285-e97095f6ff2e" />
 
 ## Quiet Shelf
 
