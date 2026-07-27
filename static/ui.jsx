@@ -131,12 +131,7 @@ function FinishedBook({ title, author, coverUrl, bg, ink }) {
           <div
             className="qs-book__face"
             style={{ backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          >
-            {/* Title and author overlay — white with shadow so readable over any cover */}
-            <div className="qs-book__rule" aria-hidden="true" style={{ background: 'rgba(255,255,255,0.7)' }}></div>
-            <h3 className="qs-book__title" style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}>{title}</h3>
-            <span className="qs-book__author" style={{ color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>{author}</span>
-          </div>
+          ></div>
         </div>
       </div>
     );

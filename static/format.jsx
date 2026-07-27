@@ -284,21 +284,68 @@ function Format() {
 
   if (phase === 'done') {
     const displayCover = coverPreviewUrl || photoPreviewUrl;
+    const bookTitle = title || 'Your book';
+    const bookAuthor = author || '';
     return (
       <div className="qs-page qs-page--narrow qs-payoff">
-        <p className="qs-payoff__title">It\u2019s a book now.</p>
-        <p className="qs-payoff__sub">Your story, on the shelf \u2014 real.</p>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+          <p style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
+            color: 'var(--ember-400)',
+            margin: '0 0 var(--space-2)',
+            lineHeight: 1.2,
+          }}>
+            It's a book now.
+          </p>
+          <p style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
+            color: 'var(--text-muted)',
+            margin: '0 0 var(--space-2)',
+          }}>
+            {bookTitle}
+          </p>
+          {bookAuthor ? (
+            <p style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 'var(--fs-small)',
+              color: 'var(--text-faint)',
+              margin: 0,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}>
+              by {bookAuthor}
+            </p>
+          ) : null}
+        </div>
+
         <div className="qs-shelfwrap qs-shelfwrap--lg">
           <Shelf lit={true}>
             <FinishedBook
-              title={title || 'Your book'}
-              author={author || ' '}
+              title={bookTitle}
+              author={bookAuthor}
               coverUrl={displayCover}
               bg={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).bg}
               ink={(QS_COVER_PALETTE[theme] || QS_COVER_PALETTE.classic).ink}
             />
           </Shelf>
         </div>
+
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
+          <p style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 'var(--fs-small)',
+            color: 'var(--text-faint)',
+            fontStyle: 'italic',
+            margin: '0 0 var(--space-6)',
+          }}>
+            Your story, made real.
+          </p>
+        </div>
+
         <div className="qs-payoff__action">
           <QSButton size="lg" icon="book-open" onClick={download}>Download your ebook</QSButton>
           <button type="button" className="qs-payoff__again" onClick={reset}>
@@ -400,21 +447,33 @@ function Format() {
           )}
 
           {suggestions.length > 0 && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 'var(--space-4)',
-              marginBottom: 'var(--space-4)',
-            }}>
-              {suggestions.map((photo, i) => (
-                <PhotoCard
-                  key={i}
-                  photo={photo}
-                  selected={chosenPhoto && chosenPhoto.url === photo.url}
-                  onSelect={setChosenPhoto}
-                />
-              ))}
-            </div>
+            <>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 'var(--space-4)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                {suggestions.map((photo, i) => (
+                  <PhotoCard
+                    key={i}
+                    photo={photo}
+                    selected={chosenPhoto && chosenPhoto.url === photo.url}
+                    onSelect={setChosenPhoto}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                className="qs-payoff__again"
+                onClick={loadSuggestions}
+                disabled={suggestionsLoading}
+                style={{ marginBottom: 'var(--space-4)' }}
+              >
+                <QSIcon name="refresh-cw" size={13} />
+                {suggestionsLoading ? 'Finding more...' : 'Try different photos'}
+              </button>
+            </>
           )}
 
           {chosenPhoto && (
