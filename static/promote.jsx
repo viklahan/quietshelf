@@ -87,15 +87,24 @@ function saveLastResult(r) {
   } catch (e) {}
 }
 
+const QS_VIDEO_SITES = [
+  { id: 'pexels',  label: 'Pexels',  url: function(term, op) { return 'https://www.pexels.com/search/videos/' + encodeURIComponent(term) + '/' + op; } },
+  { id: 'pixabay', label: 'Pixabay', url: function(term) { return 'https://pixabay.com/videos/search/' + encodeURIComponent(term) + '/'; } },
+  { id: 'coverr',  label: 'Coverr',  url: function(term) { return 'https://coverr.co/s?q=' + encodeURIComponent(term); } },
+  { id: 'mixkit',  label: 'Mixkit',  url: function(term) { return 'https://mixkit.co/free-stock-video/' + encodeURIComponent(term) + '/'; } },
+];
+
 function Promote() {
   const { Becoming, CopyButton, useKeptDraft, loadLastMap, GroundRow, Tooltip } = window;
 
   const [phase, setPhase] = React.useState(() => (loadLastResult() ? 'done' : 'compose'));
   const [text, setText] = useKeptDraft('qs.draft.promote');
+  const [file, setFile] = React.useState(null);
   const [error, setError] = React.useState('');
   const [found, setFound] = React.useState(() => { const r = loadLastResult(); return r ? (r.found || {}) : {}; });
   const [segs, setSegs] = React.useState(() => { const r = loadLastResult(); return r ? r.segs : []; });
   const [orientation, setOrientation] = React.useState('both');
+  const [videoSite, setVideoSite] = React.useState('pexels');
   const [gmap] = React.useState(loadLastMap);
   const [useMap, setUseMap] = React.useState(() => {
     const m = loadLastMap();
@@ -106,10 +115,40 @@ function Promote() {
   const [totalChunks, setTotalChunks] = React.useState(0);
   const [doneChunks, setDoneChunks] = React.useState(0);
   const streamCleanupRef = React.useRef(null);
+  const fileRef = React.useRef(null);
 
   React.useEffect(() => () => { if (streamCleanupRef.current) streamCleanupRef.current(); }, []);
 
   const words = countWords(text);
+
+  function onPickFile(e) {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (!['docx', 'rtf', 'txt'].includes(ext)) {
+      setError('I can only read Word (.docx), RTF, or text files. Try one of those?');
+      return;
+    }
+    setError('');
+    // Read the file text so the word counter and stream both see it
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      setText(ev.target.result || '');
+      setFile(f);
+    };
+    reader.onerror = function() { setError('Could not read that file. Try copying the text directly.'); };
+    // For DOCX we can't read raw text — just store the file and let the backend handle it
+    if (ext === 'docx') {
+      setFile(f);
+    } else {
+      reader.readAsText(f);
+    }
+  }
+
+  function clearFile() {
+    setFile(null);
+    if (fileRef.current) fileRef.current.value = '';
+  }
 
   function keepClip(names, url) {
     const next = Object.assign({}, castings);
@@ -212,6 +251,8 @@ function Promote() {
     setFound({});
     setSegs([]);
     setGroundedBy(null);
+    setFile(null);
+    if (fileRef.current) fileRef.current.value = '';
     saveLastResult(null);
   }
 
@@ -256,6 +297,19 @@ function Promote() {
           <CopyButton text={notionText()} label="Copy for Notion" />
         </div>
 
+        <div className="qs-groundrow" role="radiogroup" aria-label="Video source">
+          {QS_VIDEO_SITES.map(function(site) {
+            return (
+              <button key={site.id} type="button" role="radio"
+                aria-checked={videoSite === site.id}
+                className={'qs-pill' + (videoSite === site.id ? ' qs-pill--on' : '')}
+                onClick={function() { setVideoSite(site.id); }}>
+                {site.label}
+              </button>
+            );
+          })}
+        </div>
+
         {groundedBy ? (
           <p className="qs-quiethint" style={{ margin: '0 0 var(--space-6) 0' }}>
             Grounded by your story map {'\u00b7'} {groundedBy.n} {groundedBy.n === 1 ? 'character' : 'characters'}
@@ -284,11 +338,11 @@ function Promote() {
                   {s.terms.length ? (
                     <a
                       className="qs-casting__link"
-                      href={'https://www.pexels.com/search/videos/' + encodeURIComponent(s.terms[0]) + '/' + orientationParam(orientation)}
+                      href={(QS_VIDEO_SITES.find(function(x){return x.id===videoSite;})||QS_VIDEO_SITES[0]).url(s.terms[0],orientationParam(orientation))}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      {'Open best match in Pexels' + (orientation !== 'both' ? ' (' + orientation + ')' : '') + ' \u2197'}
+                      {'Open in ' + ((QS_VIDEO_SITES.find(function(x){return x.id===videoSite;})||QS_VIDEO_SITES[0]).label) + (orientation !== 'both' ? ' (' + orientation + ')' : '') + ' ↗'}
                     </a>
                   ) : null}
                   {s.cast.filter(function(n) { return castings[n] && castings[n].url; }).map(function(n) {
@@ -341,6 +395,30 @@ function Promote() {
           ariaLabel="Your writing"
         />
       </div>
+
+      <div className="qs-or"><span>or</span></div>
+
+      <input
+        ref={fileRef} type="file" accept=".docx,.rtf,.txt"
+        onChange={onPickFile}
+        style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0, opacity: 0 }}
+        tabIndex={-1}
+      />
+      {file ? (
+        <div className="qs-file qs-drop--filled">
+          <span className="qs-file__name">
+            <QSIcoPromo name="file-text" size={18} className="qs-file__ico" />{file.name}
+          </span>
+          <button type="button" className="qs-payoff__again" onClick={clearFile}>Remove</button>
+        </div>
+      ) : (
+        <button type="button" className="qs-drop"
+          onClick={function() { fileRef.current && fileRef.current.click(); }}>
+          <span className="qs-drop__ico"><QSIcoPromo name="file-text" size={28} /></span>
+          <p className="qs-drop__line">Bring me your writing.</p>
+          <p className="qs-drop__hint">Word, RTF, or text</p>
+        </button>
+      )}
       <div className="qs-meter">
         <span><strong>{words.toLocaleString()}</strong> words</span>
         <span aria-hidden="true">{'\u00b7'}</span>
