@@ -31,7 +31,9 @@ from app.services.storymap.models import Character, StoryMap
 
 logger = logging.getLogger("quietshelf.promote")
 
-CHUNK_TARGET_WORDS = 200      # ~80s of narration; keeps each JSON response small
+CHUNK_TARGET_WORDS = 400      # ~160s of narration per chunk. 200 was too small —
+                               # fragments lack narrative context for good search terms.
+                               # 400 halves API calls and doubles coherence.
 RATE_LIMIT_RETRIES = 2        # per-chunk retries if a parallel burst gets throttled
 
 
@@ -45,21 +47,25 @@ def _max_concurrency() -> int:
 SYSTEM_PROMPT = """\
 You are a visual mapping engine for video essays that use stock footage.
 
-You receive an EXCERPT from a longer narration script. Pace is ~150 words per minute.
+You receive a PASSAGE from a narration script. Pace is ~150 words per minute.
 
-Break this excerpt into visual segments (every 1-3 sentences, wherever the on-screen visual should change). For each segment provide:
+Break this passage into visual segments (every 1-3 sentences, wherever the on-screen visual should change). For each segment provide:
 
-- script_text: the exact sentences from the excerpt (do not paraphrase)
-- search_terms: exactly 6 stock-footage search terms, ranked best first. Terms must be optimized for stock libraries like Pexels: simple, concrete, describing actions/settings/emotions ("man walking alone city night"), never abstract concepts ("loneliness of modern existence"). Prefer terms with high stock availability - avoid hyper-specific scenes that won't exist. Give a range of distinct angles (subject, setting, mood, action) so the writer has real choices.
-- clip_duration_seconds: integer estimate of how long this segment stays on screen, from its narration length at ~150 wpm
-- mood: one or two lowercase words (e.g., "hopeful", "tense", "warm")
+- script_text: the EXACT sentences from the passage (copy them verbatim, do not paraphrase or summarize)
+- search_terms: exactly 6 stock-footage search terms. EACH TERM MUST BE 2-5 WORDS. Single words are FORBIDDEN. Terms must describe a filmable scene: "elderly fisherman mending nets at dawn", "child running through rain puddles", "old letter on wooden table candlelight". Never single words like "fishing" or "rain" or "letter". Never abstract: "loneliness", "hope", "passage of time". Give a range of angles (establishing shot, close-up, action, atmosphere) so the writer has real choices.
+- clip_duration_seconds: integer seconds this segment stays on screen, based on its word count at ~150 wpm
+- mood: one or two lowercase words describing the emotional tone (e.g. "tense", "warm", "melancholy", "hopeful", "urgent", "reflective")
 
 Also provide:
-- video_title_suggestion: a short working title for the whole video, your best guess from this excerpt's theme
+- video_title_suggestion: a short working title based on the passage theme
 
-Cover the COMPLETE excerpt from start to finish. Never summarize, skip, or stop early. Do not output start/end times - only clip_duration_seconds per segment.
+CRITICAL RULES:
+1. Cover EVERY sentence in the passage from first to last. Never skip, summarize, or stop early.
+2. script_text must contain the actual sentences verbatim.
+3. search_terms: MINIMUM 2 WORDS PER TERM. Single word terms will break the app.
+4. If you run out of output space, finish the current segment cleanly.
 
-Respond with ONLY a valid JSON object matching this structure. No markdown fences, no commentary, no preamble.
+Respond with ONLY a valid JSON object. No markdown fences, no commentary, no preamble.
 """
 
 # Appended when the writer attaches their Story Map. The sheet makes search
@@ -86,8 +92,26 @@ _STOPWORDS = set(
 
 
 def _split_sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
-    return [p.strip() for p in parts if p.strip()]
+    """Split text into mappable units. Handles:
+    - Standard sentence endings (.!?)
+    - Paragraph breaks (blank lines) — treated as hard boundaries
+    - Lines that are structural headings (short, no sentence punctuation)
+    Each unit is a non-empty string of prose the AI can map visually.
+    """
+    # First split on paragraph boundaries (two or more newlines)
+    paragraphs = re.split(r'\n{2,}', text.strip())
+    sentences: list[str] = []
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        # Split paragraph into sentences on .!? followed by whitespace
+        parts = re.split(r'(?<=[.!?])\s+', para)
+        for part in parts:
+            part = part.strip()
+            if part:
+                sentences.append(part)
+    return sentences or [text.strip()]
 
 
 def _chunk_script(script: str, target_words: int) -> list[str]:
@@ -203,6 +227,24 @@ def _ground_segment(text: str, terms: list[str], cast: list[Character]) -> tuple
     return grounded[:8], [ch.name for ch in present]
 
 
+def _pad_short_terms(terms: list[str], context: str) -> list[str]:
+    """Ensure no single-word terms reach the UI. If a term is one word,
+    pad it with a context word from the segment text."""
+    context_words = [w for w in re.findall(r'[a-zA-Z]{4,}', context.lower())
+                     if w not in _STOPWORDS]
+    result = []
+    for term in terms:
+        words = term.strip().split()
+        if len(words) < 2 and context_words:
+            # Append first unused context word
+            for cw in context_words:
+                if cw not in term.lower():
+                    term = term + ' ' + cw
+                    break
+        result.append(term)
+    return result
+
+
 def _fallback_chunk(chunk: str) -> ChunkResult:
     """Local, never-fails coarse mapping (~2 sentences per segment) so a chunk
     the model couldn't handle still gets full coverage with editable keywords."""
@@ -262,6 +304,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
                 if story_map
                 else (draft.search_terms, [])
             )
+            terms = _pad_short_terms(terms, draft.script_text)
             segments.append(
                 Segment(
                     id=len(segments) + 1,

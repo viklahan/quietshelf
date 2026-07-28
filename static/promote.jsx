@@ -5,7 +5,7 @@ const QSDS_promo = window.QuietFightClubDesignSystem_fae847;
 const { Button: QSBtnPromo, Icon: QSIcoPromo, ScriptTextarea: QSScriptTA, ManuscriptCard } = QSDS_promo;
 
 const QS_MIN_WORDS = 100;
-const QS_MAX_WORDS = 5000;
+const QS_MAX_WORDS = 999999; // no cap — send the whole story
 
 function countWords(s) {
   const t = s.trim();
@@ -42,10 +42,10 @@ function pickTextTokens(text, count) {
 
 function moodToTone(mood) {
   const m = (mood || '').toLowerCase();
-  if (/(hope|warm|joy|resolved|tender|love|calm|peace|gentle)/.test(m)) return 'ember';
-  if (/(tense|dark|grief|fear|turning|danger|storm|anger|loss)/.test(m)) return 'oxblood';
-  if (/(solemn|quiet|still|somber|reflect|grey|melanchol)/.test(m)) return 'paper';
-  return 'neutral';
+  if (/(hope|warm|joy|resolv|tender|love|calm|peace|gentle|bright|uplift|triumph|celebrat|relief|comfort|nostalgic|bittersweet)/.test(m)) return 'ember';
+  if (/(tense|dark|grief|fear|turning|danger|storm|anger|loss|despair|dread|haunt|ominous|tragic|urgent|anxious|conflict|bitter|brutal)/.test(m)) return 'oxblood';
+  if (/(solemn|quiet|still|somber|reflect|grey|melanchol|contemplat|wistful|pensive|mournful|serene|subdued|restrained|introspect)/.test(m)) return 'paper';
+  return 'ember'; // default to warm rather than dead neutral
 }
 
 function toCard(seg) {
@@ -114,6 +114,7 @@ function Promote() {
   const [castings, setCastings] = React.useState(loadCastings);
   const [totalChunks, setTotalChunks] = React.useState(0);
   const [doneChunks, setDoneChunks] = React.useState(0);
+  const [inputWordCount, setInputWordCount] = React.useState(0);
   const streamCleanupRef = React.useRef(null);
   const fileRef = React.useRef(null);
 
@@ -163,10 +164,6 @@ function Promote() {
       setError('This looks like a fragment. Paste the full piece (at least ' + QS_MIN_WORDS + ' words) for a proper visual map.');
       return;
     }
-    if (words > QS_MAX_WORDS) {
-      setError("That's a long piece (" + words.toLocaleString() + ' words). Split it into parts of ' + QS_MAX_WORDS.toLocaleString() + ' words or fewer.');
-      return;
-    }
     const grounding = useMap && gmap ? gmap : null;
     setError('');
     setFound({});
@@ -174,6 +171,7 @@ function Promote() {
     setGroundedBy(null);
     setTotalChunks(0);
     setDoneChunks(0);
+    setInputWordCount(words);
     setPhase('becoming');
 
     const cleanup = window.QS_API.promoteStream(
@@ -234,6 +232,7 @@ function Promote() {
   }
 
   const doneCount = segs.filter(function(s) { return found[s.index]; }).length;
+  const mappedWords = segs.reduce(function(acc, s) { return acc + countWords(s.excerpt); }, 0);
 
   function notionText() {
     return segs.map(function(s) {
@@ -250,6 +249,7 @@ function Promote() {
     setSegs([]);
     setGroundedBy(null);
     setFile(null);
+    setText('');
     if (fileRef.current) fileRef.current.value = '';
     saveLastResult(null);
   }
@@ -283,6 +283,12 @@ function Promote() {
         <div className="qs-mapline">
           <QSIcoPromo name="list-checks" size={16} />
           <span className="qs-mapline__count">{String(doneCount).padStart(2, '0')} of {String(segs.length).padStart(2, '0')} mapped</span>
+          {mappedWords > 0 && inputWordCount > 0 ? (
+            <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
+              {'· '}{mappedWords.toLocaleString()} of {inputWordCount.toLocaleString()} words covered
+              {mappedWords < inputWordCount * 0.95 ? ' ⚠️ incomplete' : ' ✓'}
+            </span>
+          ) : null}
           {isLoading ? (
             <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
               {'\u2014 mapping segment ' + doneChunks + ' of ' + totalChunks + '\u2026'}
@@ -439,7 +445,7 @@ function Promote() {
             </button>
           );
         })}
-        <Tooltip text="Filters the open-in-Pexels link to wide (horizontal), tall (vertical), or square footage. Your editable search terms are unaffected." />
+        <Tooltip text="Filters the video search links to wide (horizontal), tall (vertical), or square footage. Your editable search terms are unaffected." />
       </div>
       {error ? <p className="qs-note"><QSIcoPromo name="circle-alert" size={16} /><span>{error}</span></p> : null}
       <div className="qs-actionrow">

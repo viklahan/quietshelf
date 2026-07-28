@@ -23,6 +23,7 @@ from app.services.promote.mapper import (
     _try_map_chunk,
     _fallback_chunk,
     _ground_segment,
+    _pad_short_terms,
     _mmss,
     _max_concurrency,
     map_script,
@@ -193,6 +194,7 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                     if story_map
                     else (draft.search_terms, [])
                 )
+                terms = _pad_short_terms(terms, draft.script_text)
                 segment_id[0] += 1
                 seg = Segment(
                     id=segment_id[0],

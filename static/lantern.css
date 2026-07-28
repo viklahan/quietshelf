@@ -106,14 +106,13 @@
 /* ── Lantern ───────────────────────────────────────────────────────── */
 
 .qs-lantern {
-  position: absolute;
-  bottom: 22px; /* sits ON the shelf plank */
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   z-index: 10;
+  /* Lift the lantern so it sits ON the shelf plank */
+  margin-bottom: 0;
 }
 
 /* Glow cast on the shelf and books around the lantern */

@@ -173,6 +173,7 @@
   // Returns a cleanup function to abort the stream
   function promoteStream(script, storyMap, { onChunk, onDone, onError }) {
     let aborted = false;
+    let completed = false; // true once we receive the 'done' event
     const ctrl = new AbortController();
 
     fetch(BASE + '/api/promote/stream', {
@@ -200,13 +201,16 @@
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks);
-            else if (evt.type === 'done') onDone(evt.title, evt.estimated_runtime_seconds);
+            else if (evt.type === 'done') { completed = true; onDone(evt.title, evt.estimated_runtime_seconds); }
             else if (evt.type === 'error') onError(evt.message);
           } catch (e) { /* malformed line, skip */ }
         }
       }
     }).catch((err) => {
-      if (!aborted) onError(err.message || 'Stream interrupted.');
+      // If we already received 'done', the stream closed cleanly.
+      // Some browsers/nginx combos fire a network error on clean SSE close
+      // — ignore it so the user doesn't see a false error after a successful map.
+      if (!aborted && !completed) onError(err.message || 'Stream interrupted.');
     });
 
     return () => { aborted = true; ctrl.abort(); };

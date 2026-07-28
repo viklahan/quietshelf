@@ -48,7 +48,7 @@ LLM_TIMEOUT_SECONDS = 120.0
 
 # Promote word bounds
 MIN_WORDS = 100
-MAX_WORDS = 5000
+MAX_WORDS = 999999  # no real cap — the chunker handles any length
 
 
 def provider_name() -> str:

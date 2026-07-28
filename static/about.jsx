@@ -72,8 +72,10 @@ function BookShelf({ lanternState }) {
             />
           );
         })}
-        {/* Gap for the lantern */}
-        <div style={{ width: '52px', flexShrink: 0 }}></div>
+        {/* Gap with lantern sitting in it */}
+        <div style={{ width: '60px', flexShrink: 0, position: 'relative', alignSelf: 'flex-end' }}>
+          <Lantern state={lanternState} />
+        </div>
         {rightBooks.map(function(b, i) {
           return (
             <div
@@ -85,7 +87,6 @@ function BookShelf({ lanternState }) {
         })}
       </div>
       <div className="qs-shelf__plank"></div>
-      <Lantern state={lanternState} />
     </div>
   );
 }
