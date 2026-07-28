@@ -300,9 +300,13 @@ function OpenBook({ blob, title, author, sample, closing, onClose }) {
         } catch (err) {}
       });
       book.ready.then(() => {
-        const items = book.spine && book.spine.items;
-        const startHref = items && items.length > 1 ? items[1].href : undefined;
-        return rendition.display(startHref);
+        // Open on the first chapter, not the front matter: in a spread the
+        // cover + title page read as the title twice, and the writer wants
+        // to land on their words. Front matter stays reachable by paging back.
+        const items = (book.spine && book.spine.items) || [];
+        const firstChapter = items.find((it) => /ch\d+/i.test(it.href || ''));
+        const start = firstChapter || items[1] || items[0];
+        return rendition.display(start && start.href);
       }).catch(() => rendition.display())
         // Build the book-wide page map, then refresh the counter for the
         // spread already on screen. Failure just keeps the per-section count.

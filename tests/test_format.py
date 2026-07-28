@@ -174,6 +174,41 @@ def test_convert_txt_with_generated_cover(tmp_path):
         assert any("cover" in n.lower() for n in names), f"no cover entry found in: {names}"
 
 
+def test_drop_cap_is_scoped_to_chapter_openings():
+    """The classic drop cap must decorate the first paragraph AFTER a chapter
+    heading — p:first-of-type hangs it on whatever paragraph happens to come
+    first in the file (it landed on 'Copyright…' when front matter leaked in)."""
+    from app.services.format.themes import THEMES, Theme
+
+    css = THEMES[Theme.classic].css_path.read_text(encoding="utf-8")
+    assert "h1 + p::first-letter" in css
+    assert "p:first-of-type::first-letter" not in css
+
+
+def test_copyright_lives_on_title_page_not_in_chapter_one(sample_docx, tmp_path):
+    """The rights line belongs to pandoc's title page (from metadata). The old
+    --include-before-body hack glued a copyright block into ch001.xhtml, which
+    made Chapter One start mid-page, duplicated the copyright, and hung the
+    drop cap on the word 'Copyright'."""
+    import zipfile
+
+    from app.services.format.converter import convert_to_epub
+    from app.services.format.models import Theme
+
+    out = tmp_path / "book.epub"
+    convert_to_epub(
+        source=sample_docx, out_path=out,
+        title="My Stories", author="Jane Writer", theme=Theme.classic,
+    )
+    with zipfile.ZipFile(out) as zf:
+        chapters = sorted(n for n in zf.namelist() if "/ch" in n and n.endswith(".xhtml"))
+        assert chapters, "no chapter files in EPUB"
+        first_chapter = zf.read(chapters[0]).decode("utf-8")
+        title_page = zf.read(next(n for n in zf.namelist() if "title_page" in n)).decode("utf-8")
+    assert "Copyright" not in first_chapter
+    assert "Copyright © 2026 Jane Writer" in title_page or "Copyright ©" in title_page
+
+
 def test_convert_rejects_unknown_extension(tmp_path):
     from app.services.format.converter import convert_to_epub, UnsupportedFormat
     from app.services.format.models import Theme

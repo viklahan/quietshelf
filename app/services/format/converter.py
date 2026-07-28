@@ -38,16 +38,6 @@ class EpubValidationError(Exception):
     """The produced file is not a well-formed EPUB."""
 
 
-def _copyright_html(author: str, year: int) -> str:
-    return (
-        "<div style=\"page-break-before: always; text-align: center; "
-        "margin-top: 35%;\">"
-        f"<p>Copyright &#169; {year} {author}</p>"
-        "<p>All rights reserved.</p>"
-        "</div>"
-    )
-
-
 # ---------------------------------------------------------------------------
 # Chapter heading normaliser
 # ---------------------------------------------------------------------------
@@ -250,9 +240,10 @@ def convert_to_epub(
             encoding="utf-8",
         )
 
-        copyright_file = workdir / "copyright.html"
-        copyright_file.write_text(_copyright_html(safe_author, year), encoding="utf-8")
-
+        # No injected copyright block: the rights metadata above puts the
+        # copyright line on pandoc's title page. --include-before-body would
+        # glue it into the first chapter file instead (mid-page chapter one,
+        # duplicated rights, drop cap on the word "Copyright").
         extra_args = [
             "--standalone",
             "--toc",
@@ -261,7 +252,6 @@ def convert_to_epub(
             f"--metadata-file={meta}",
             f"--css={spec.css_path}",
             f"--epub-cover-image={cover_path}",
-            f"--include-before-body={copyright_file}",
         ]
         for font in spec.font_paths:
             extra_args.append(f"--epub-embed-font={font}")

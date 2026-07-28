@@ -18,9 +18,12 @@ h1, h2 {
   text-align: center; margin: 2em 0 1.2em; page-break-before: always;
   letter-spacing: 0.04em;
 }
-p { margin: 0; text-indent: 1.4em; }
+/* A chapter opens like a print book: the heading sits well down the page. */
+h1 { margin: 4.5em 0 2.4em; }
+p { margin: 0; text-indent: 1.4em; widows: 2; orphans: 2; }
 p:first-of-type, h1 + p, h2 + p { text-indent: 0; }
-p:first-of-type::first-letter {
+/* Drop cap only on the paragraph that opens a chapter. */
+h1 + p::first-letter {
   font-size: 3.2em; line-height: 0.9; float: left;
   padding: 0.02em 0.06em 0 0; font-weight: normal;
 }
