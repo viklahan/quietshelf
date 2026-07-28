@@ -72,9 +72,11 @@ function BookShelf({ lanternState }) {
             />
           );
         })}
-        {/* Gap with lantern sitting in it */}
-        <div style={{ width: '60px', flexShrink: 0, position: 'relative', alignSelf: 'flex-end' }}>
-          <Lantern state={lanternState} />
+        {/* Gap with lantern anchored inside it */}
+        <div style={{ width: '60px', flexShrink: 0, position: 'relative' }}>
+          <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }}>
+            <Lantern state={lanternState} />
+          </div>
         </div>
         {rightBooks.map(function(b, i) {
           return (

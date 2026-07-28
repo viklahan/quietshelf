@@ -83,6 +83,7 @@
   height: 88px;
   min-height: 88px; /* out-specifies kit.css's min-height:150px */
   justify-content: flex-start;
+  overflow: visible; /* lantern is taller than the row — must not clip */
 }
 
 .qs-book-spine {
