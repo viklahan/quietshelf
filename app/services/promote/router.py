@@ -98,23 +98,25 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
     system = SYSTEM_PROMPT + (CAST_ADDENDUM.format(cast=cast_context) if cast_context else "")
     chunks = _chunk_script(body.script, CHUNK_TARGET_WORDS)
     total = len(chunks)
+    concurrency = min(_max_concurrency(), total)
 
-    logger.info("promote_stream chunks=%d grounded=%s", total, bool(cast_context))
+    logger.info("promote_stream chunks=%d concurrency=%d grounded=%s", total, concurrency, bool(cast_context))
 
-    # Each worker thread puts its result into this queue as soon as it's done.
-    # The generator below reads from it and yields SSE events — so the first
-    # segments reach the browser the moment the fastest chunk finishes, not
-    # after all of them do.
     result_queue: queue.Queue = queue.Queue()
+    # Semaphore limits parallel AI calls — same discipline as map_script's
+    # ThreadPoolExecutor. Without this, 25 chunks all fire at once and blow
+    # Gemini's daily quota in the first few seconds.
+    sem = threading.Semaphore(concurrency)
 
     def worker(idx: int, chunk: str) -> None:
-        try:
-            result = _try_map_chunk(chunk, system)
-            if result is None:
-                result = _fallback_chunk(chunk)
-            result_queue.put((idx, result, None))
-        except Exception as exc:  # noqa: BLE001
-            result_queue.put((idx, None, exc))
+        with sem:
+            try:
+                result = _try_map_chunk(chunk, system)
+                if result is None:
+                    result = _fallback_chunk(chunk)
+                result_queue.put((idx, result, None))
+            except Exception as exc:  # noqa: BLE001
+                result_queue.put((idx, None, exc))
 
     # Fire all chunks concurrently — same as the batch endpoint.
     threads = [threading.Thread(target=worker, args=(i, c), daemon=True) for i, c in enumerate(chunks)]
@@ -122,15 +124,17 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
         t.start()
 
     def event_stream():
-        # Mutable state shared across the generator.
         cumulative = 0
         segment_id = 1
         title = ""
         received = 0
+        # Buffer results keyed by chunk index so we can stitch in script order
+        # even though chunks arrive in completion order (fastest first).
+        buffer: dict = {}
+        next_to_emit = 0
 
         yield f"data: {json.dumps({'type': 'meta', 'total_chunks': total})}\n\n"
 
-        # Collect results in completion order (fastest chunk first).
         while received < total:
             try:
                 idx, result, exc = result_queue.get(timeout=120)
@@ -144,32 +148,39 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                 logger.warning("promote_stream chunk %d failed: %s", idx, exc)
                 result = _fallback_chunk(chunks[idx])
 
-            if not title and result.video_title_suggestion.strip():
-                title = result.video_title_suggestion.strip()
+            buffer[idx] = result
 
-            segments_out = []
-            for draft in result.segments:
-                duration = max(1, int(draft.clip_duration_seconds))
-                terms, cast = (
-                    _ground_segment(draft.script_text, draft.search_terms, story_map.characters)
-                    if story_map
-                    else (draft.search_terms, [])
-                )
-                seg = Segment(
-                    id=segment_id,
-                    script_text=draft.script_text,
-                    start_time=_mmss(cumulative),
-                    end_time=_mmss(cumulative + duration),
-                    search_terms=terms,
-                    clip_duration_seconds=duration,
-                    mood=draft.mood,
-                    cast=cast,
-                )
-                segments_out.append(seg.model_dump())
-                segment_id += 1
-                cumulative += duration
+            # Emit all consecutive chunks from next_to_emit that are ready
+            while next_to_emit in buffer:
+                r = buffer.pop(next_to_emit)
 
-            yield f"data: {json.dumps({'type': 'chunk', 'chunk_index': idx, 'segments': segments_out, 'chunks_done': received, 'total_chunks': total})}\n\n"
+                if not title and r.video_title_suggestion.strip():
+                    title = r.video_title_suggestion.strip()
+
+                segments_out = []
+                for draft in r.segments:
+                    duration = max(1, int(draft.clip_duration_seconds))
+                    terms, cast = (
+                        _ground_segment(draft.script_text, draft.search_terms, story_map.characters)
+                        if story_map
+                        else (draft.search_terms, [])
+                    )
+                    seg = Segment(
+                        id=segment_id,
+                        script_text=draft.script_text,
+                        start_time=_mmss(cumulative),
+                        end_time=_mmss(cumulative + duration),
+                        search_terms=terms,
+                        clip_duration_seconds=duration,
+                        mood=draft.mood,
+                        cast=cast,
+                    )
+                    segments_out.append(seg.model_dump())
+                    segment_id += 1
+                    cumulative += duration
+
+                yield f"data: {json.dumps({'type': 'chunk', 'chunk_index': next_to_emit, 'segments': segments_out, 'chunks_done': received, 'total_chunks': total})}\n\n"
+                next_to_emit += 1
 
         yield f"data: {json.dumps({'type': 'done', 'title': title or 'Your video', 'estimated_runtime_seconds': cumulative})}\n\n"
 
