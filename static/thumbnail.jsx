@@ -36,15 +36,50 @@ function extractHooks(segments, max) {
   return candidates.slice(0, max);
 }
 
-function emotionQuery(mood) {
+// Mood -> a POOL of person-and-emotion stock searches. We rotate through the
+// pool (and shuffle within it) on each "find a face" click so the writer gets
+// fresh options every time instead of the same top hits.
+const QS_EMOTION_POOLS = {
+  warm: [
+    'hopeful person soft light portrait looking away',
+    'woman gentle smile warm window light',
+    'man quiet contentment golden hour portrait',
+    'person peaceful expression soft daylight',
+    'candid portrait warm tender mood looking up',
+    'person calm serene face natural light',
+  ],
+  dark: [
+    'somber person dramatic low light portrait',
+    'man serious shadowed face moody',
+    'woman intense gaze dark background portrait',
+    'person troubled expression dim light',
+    'brooding portrait harsh shadow close up',
+    'person distressed face dark cinematic',
+  ],
+  quiet: [
+    'pensive person looking away window moody portrait',
+    'woman thoughtful gaze soft shadow',
+    'man reflective expression muted light portrait',
+    'person melancholy looking out window',
+    'wistful portrait subdued tone looking down',
+    'person contemplative face grey light',
+  ],
+  neutral: [
+    'contemplative person moody portrait looking away',
+    'person candid expression natural portrait',
+    'thoughtful face soft studio light',
+    'person quiet mood cinematic portrait',
+    'introspective portrait muted background',
+    'person calm gaze editorial photo',
+  ],
+};
+
+function emotionPool(mood) {
   const m = (mood || '').toLowerCase();
-  if (/(hope|warm|joy|tender|uplift|bright|relief|comfort)/.test(m))
-    return 'hopeful person soft light portrait looking away';
-  if (/(tense|dark|grief|fear|anger|despair|dread|anxious|conflict)/.test(m))
-    return 'somber person dramatic low light portrait';
-  if (/(quiet|still|somber|reflect|melanchol|wistful|pensive|resigned|bittersweet)/.test(m))
-    return 'pensive person looking away window moody portrait';
-  return 'contemplative person moody portrait looking away';
+  if (/(hope|warm|joy|tender|uplift|bright|relief|comfort)/.test(m)) return QS_EMOTION_POOLS.warm;
+  if (/(tense|dark|grief|fear|anger|despair|dread|anxious|conflict)/.test(m)) return QS_EMOTION_POOLS.dark;
+  if (/(quiet|still|somber|reflect|melanchol|wistful|pensive|resigned|bittersweet)/.test(m)) return QS_EMOTION_POOLS.quiet;
+  return QS_EMOTION_POOLS.neutral;
 }
 
 function dominantMood(segments) {
@@ -240,6 +275,8 @@ function ThumbnailStudio(props) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const uploadRef = React.useRef(null);
+  const queryIdxRef = React.useRef(0);           // which pool phrasing to use next
+  const seenUrlsRef = React.useRef(new Set());   // photos already shown, to avoid repeats
   const canvasRefs = [React.useRef(null), React.useRef(null), React.useRef(null)];
 
   const accent = (QS_THUMB_ACCENTS.find(function (a) { return a.id === accentId; }) || {}).hex || null;
@@ -270,11 +307,19 @@ function ThumbnailStudio(props) {
   function searchPeople() {
     setLoadingPeople(true);
     setError('');
-    window.QS_API.thumbnailPeople({ emotion: emotionQuery(mood), n: 6 })
+    const pool = emotionPool(mood);
+    // Pick the next phrasing in the pool, wrapping around.
+    const query = pool[queryIdxRef.current % pool.length];
+    queryIdxRef.current += 1;
+    window.QS_API.thumbnailPeople({ emotion: query, n: 8 })
       .then(function (res) {
-        const list = (res.suggestions || []).filter(function (s) { return s && (s.thumb_url || s.url); });
+        const all = (res.suggestions || []).filter(function (s) { return s && (s.thumb_url || s.url); });
+        // Prefer photos we haven't shown yet this session.
+        const fresh = all.filter(function (s) { return !seenUrlsRef.current.has(s.url || s.thumb_url); });
+        const list = (fresh.length ? fresh : all).slice(0, 6);
+        list.forEach(function (s) { seenUrlsRef.current.add(s.url || s.thumb_url); });
         setPeople(list);
-        if (!list.length) setError('No photos came back - try uploading your own.');
+        if (!list.length) setError('No photos came back - try again or upload your own.');
       })
       .catch(function (err) { setError((err && err.message) || 'Photo search failed.'); })
       .finally(function () { setLoadingPeople(false); });
@@ -371,7 +416,7 @@ function ThumbnailStudio(props) {
         <label className="qs-thumblabel">Face</label>
         <div className="qs-actionrow" style={{ margin: 0, gap: 'var(--space-3)', justifyContent: 'flex-start' }}>
           <button type="button" className="qs-payoff__again" onClick={searchPeople} disabled={loadingPeople}>
-            <Icon name="search" size={13} />{loadingPeople ? 'Searching...' : 'Find a face'}
+            <Icon name={people.length ? 'shuffle' : 'search'} size={13} />{loadingPeople ? 'Searching...' : (people.length ? 'Show me different faces' : 'Find a face')}
           </button>
           <button type="button" className="qs-payoff__again" onClick={function () { uploadRef.current && uploadRef.current.click(); }}>
             <Icon name="upload" size={13} />Upload your own
