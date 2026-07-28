@@ -21,12 +21,13 @@ DEFAULT_MODELS = {
 }
 # Groq free model fallback list — tried in order when the primary 404s.
 # Groq deprecates models without much notice (llama-3.3-70b-versatile went
-# June 17 2026); this list self-heals instead of failing hard.
+# June 17 2026; kimi-k2-instruct-0905 went March 2026); this list self-heals.
+# Verified current on Groq free tier as of July 2026.
 DEFAULT_GROQ_FALLBACKS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
     "qwen/qwen3.6-27b",
-    "moonshotai/kimi-k2-instruct-0905",
+    "moonshotai/kimi-k2-instruct",
 ]
 # OpenRouter free model slugs get retired without notice. If the configured
 # model 404s ("unavailable for free"), the provider walks this list so the app
@@ -57,10 +58,22 @@ def provider_name() -> str:
 
 def model_name(provider: str | None = None) -> str:
     """Model for `provider` (defaults to the active LLM_PROVIDER). Providers
-    must pass their own name so waterfall members resolve their own defaults -
-    the global provider name is 'waterfall', which has no model."""
+    must pass their own name so waterfall members resolve their own defaults.
+
+    The global MODEL_NAME override is ONLY honored when running a single
+    provider directly (LLM_PROVIDER=gemini etc.) and the requested provider
+    matches it. In waterfall mode a global MODEL_NAME must NOT leak onto every
+    leg — that forced e.g. Groq to be called with 'gemini-2.5-flash' and 404.
+    Each provider always falls back to its own correct default model.
+    """
+    resolved = provider or provider_name()
     override = os.getenv("MODEL_NAME", "").strip()
-    return override or DEFAULT_MODELS.get(provider or provider_name(), "")
+    active = provider_name()
+    # Only apply the global override in single-provider mode for the active
+    # provider. Never in waterfall mode, never for a different provider.
+    if override and active != "waterfall" and resolved == active:
+        return override
+    return DEFAULT_MODELS.get(resolved, "")
 
 
 def provider_rpm(provider: str) -> int:

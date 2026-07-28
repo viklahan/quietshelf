@@ -38,10 +38,15 @@ RATE_LIMIT_RETRIES = 2        # per-chunk retries if a parallel burst gets throt
 
 
 def _max_concurrency() -> int:
+    # Default 2, not 6: Groq free tier caps openai/gpt-oss-120b at 8,000 tokens
+    # PER MINUTE. Each chunk is ~1,500 tokens; firing 6 at once instantly blows
+    # that ceiling and every chunk 429s into the keyword fallback. 2 keeps us
+    # under the limit while still overlapping calls. Override with
+    # PROMOTE_CONCURRENCY if you have a paid tier.
     try:
-        return max(1, int(os.getenv("PROMOTE_CONCURRENCY", "6")))
+        return max(1, int(os.getenv("PROMOTE_CONCURRENCY", "2")))
     except ValueError:
-        return 6
+        return 2
 
 
 SYSTEM_PROMPT = """\
