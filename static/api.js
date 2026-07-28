@@ -48,6 +48,20 @@
     return await resp.blob();
   }
 
+  // POST /api/format/cover-suggestions with a person-and-emotion query, reused
+  // for thumbnail faces. Returns the same {suggestions:[{url,thumb_url,...}]}.
+  // We phrase `title` as the emotional search so the backend's image waterfall
+  // returns portraits, not book-cover scenery.
+  async function thumbnailPeople({ emotion, n = 6 }) {
+    const fd = new FormData();
+    fd.append('title', emotion);      // e.g. "pensive man looking away portrait"
+    fd.append('passage', '');
+    fd.append('n', String(n));
+    const resp = await fetch(BASE + '/api/format/cover-suggestions', { method: 'POST', body: fd });
+    if (!resp.ok) throw await friendlyError(resp, 'Could not fetch thumbnail photos.');
+    return await resp.json();
+  }
+
   // GET /api/format/themes -> [{ id, display_name, description }]
   async function fetchThemes() {
     const resp = await fetch(BASE + '/api/format/themes');
@@ -242,7 +256,7 @@
 
   window.QS_API = {
     fetchThemes, formatBook, generateBlurb, promote, promoteStream, promoteExtract,
-    getCoverSuggestions, fetchCoverImage,
+    getCoverSuggestions, fetchCoverImage, thumbnailPeople,
     storymapScan, storymapMap, storymapImagine,
     health, sendFeedback, calmDelay,
   };

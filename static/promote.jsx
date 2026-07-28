@@ -116,6 +116,8 @@ function Promote() {
   const [totalChunks, setTotalChunks] = React.useState(0);
   const [doneChunks, setDoneChunks] = React.useState(0);
   const [inputWordCount, setInputWordCount] = React.useState(0);
+  const [showThumbnail, setShowThumbnail] = React.useState(false);
+  const [mapTitle, setMapTitle] = React.useState('');
   const streamCleanupRef = React.useRef(null);
   const chunkBufferRef = React.useRef({});
   const fileRef = React.useRef(null);
@@ -207,8 +209,9 @@ function Promote() {
             found: {},
           });
         },
-        onDone: function(_title, _runtime) {
+        onDone: function(title, _runtime) {
           setGroundedBy(grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null);
+          setMapTitle(title || '');
           setPhase('done');
           setTotalChunks(0);
           setDoneChunks(0);
@@ -300,6 +303,17 @@ function Promote() {
     );
   }
 
+  if (showThumbnail) {
+    const Studio = window.ThumbnailStudio;
+    return (
+      <Studio
+        segments={segs}
+        title={mapTitle}
+        onClose={function() { setShowThumbnail(false); }}
+      />
+    );
+  }
+
   if (phase === 'done') {
     const isLoading = totalChunks > 0 && doneChunks < totalChunks;
     return (
@@ -324,6 +338,11 @@ function Promote() {
           {!isLoading && remapCount > 0 ? (
             <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)', color: 'var(--ember-400)', borderColor: 'var(--ember-500)' }} onClick={map}>
               <QSIcoPromo name="rotate-ccw" size={13} />Remap {remapCount} unmapped
+            </button>
+          ) : null}
+          {!isLoading && segs.length > 0 ? (
+            <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={function() { setShowThumbnail(true); }}>
+              <QSIcoPromo name="image" size={13} />Make a thumbnail
             </button>
           ) : null}
           <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={clearAll}>
