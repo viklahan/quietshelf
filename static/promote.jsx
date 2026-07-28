@@ -269,21 +269,33 @@ function Promote() {
   }
 
   if (phase === 'becoming') {
-    const tokens = pickTextTokens(text);
-    const tokenTemplates = [
-      function(t) { return 'Finding a shot for ' + t + '\u2026'; },
-      function(t) { return 'Picturing a scene with ' + t + '\u2026'; },
-      function(t) { return 'Placing ' + t + ' on the timeline\u2026'; },
-    ];
-    const tokenLines = tokens.map(function(t, i) { return tokenTemplates[i % tokenTemplates.length](t); });
-    const lines = ['Reading your piece\u2026'].concat(tokenLines).concat([
-      'Breaking it into scenes\u2026',
-      'Choosing search terms\u2026',
-      'Still working \u2014 free models can be slow\u2026',
-    ]);
+    const pct = totalChunks > 0 ? Math.round((doneChunks / totalChunks) * 100) : 0;
+    const barLabel = totalChunks > 0
+      ? 'Mapping segment ' + (doneChunks + 1) + ' of ' + totalChunks
+      : 'Reading your piece\u2026';
     return (
       <div className="qs-page">
-        <Becoming lines={lines} sub="Mapping your footage." duration={3600} onDone={function() {}} />
+        <div className="qs-mapprogress">
+          <div className="qs-mapprogress__film" aria-hidden="true">
+            <QSIcoPromo name="film" size={44} />
+          </div>
+          <p className="qs-mapprogress__title">Mapping your footage</p>
+          <p className="qs-mapprogress__label">{barLabel}</p>
+          <div className="qs-mapprogress__track" role="progressbar"
+            aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
+            aria-label="Mapping progress">
+            <div
+              className={'qs-mapprogress__fill' + (totalChunks === 0 ? ' qs-mapprogress__fill--indeterminate' : '')}
+              style={totalChunks > 0 ? { width: pct + '%' } : {}}
+            ></div>
+          </div>
+          <p className="qs-mapprogress__pct">
+            {totalChunks > 0 ? pct + '%' : 'Getting started\u2026'}
+          </p>
+          <p className="qs-quiethint" style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
+            Free models can be slow — hang tight, your words are being mapped.
+          </p>
+        </div>
       </div>
     );
   }
@@ -396,9 +408,16 @@ function Promote() {
         </div>
 
         {isLoading ? (
-          <p className="qs-quiethint" style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
-            More segments on their way{'…'}
-          </p>
+          <div style={{ marginTop: 'var(--space-6)' }}>
+            <div className="qs-mapprogress__track" style={{ maxWidth: '440px', margin: '0 auto' }}
+              role="progressbar" aria-valuenow={Math.round((doneChunks / totalChunks) * 100)}
+              aria-valuemin={0} aria-valuemax={100} aria-label="Mapping progress">
+              <div className="qs-mapprogress__fill" style={{ width: Math.round((doneChunks / totalChunks) * 100) + '%' }}></div>
+            </div>
+            <p className="qs-quiethint" style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
+              Mapping segment {doneChunks} of {totalChunks} — more on their way{'…'}
+            </p>
+          </div>
         ) : (
           <div className="qs-actionrow qs-actionrow--center" style={{ marginTop: 'var(--space-12)' }}>
             <button type="button" className="qs-payoff__again" onClick={clearAll}>

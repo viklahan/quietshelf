@@ -94,3 +94,15 @@
 .qs-keptrow{display:flex;align-items:center;gap:var(--space-4);background:var(--surface-card);border:var(--border-card);border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4)}
 .qs-keptrow__line{flex:1;min-width:0;font-family:var(--font-body);font-style:italic;font-size:var(--fs-small);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
 .qs-keptrow__meta{font-family:var(--font-mono);font-size:0.66rem;letter-spacing:var(--ls-meta);text-transform:uppercase;color:var(--text-faint);white-space:nowrap}
+/* promote: mapping progress bar */
+.qs-mapprogress{max-width:440px;margin:var(--space-12) auto 0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.qs-mapprogress__film{color:var(--ember-400);opacity:0.85;margin-bottom:var(--space-4);animation:qs-mapprogress-pulse 2.4s ease-in-out infinite}
+.qs-mapprogress__title{font-family:var(--font-display);font-style:italic;font-size:clamp(1.2rem,2.6vw,1.5rem);color:var(--text-body);margin:0 0 var(--space-2)}
+.qs-mapprogress__label{font-family:var(--font-mono);font-size:var(--fs-meta);letter-spacing:var(--ls-meta);text-transform:uppercase;color:var(--text-faint);margin:0 0 var(--space-4)}
+.qs-mapprogress__track{width:100%;height:8px;background:var(--surface-raised);border:1px solid var(--edge-soft);border-radius:99px;overflow:hidden;position:relative}
+.qs-mapprogress__fill{height:100%;background:linear-gradient(90deg,var(--ember-500),var(--ember-400));border-radius:99px;transition:width var(--dur-base,0.4s) var(--ease-settle,ease-out);min-width:2px}
+.qs-mapprogress__fill--indeterminate{width:35%!important;animation:qs-mapprogress-slide 1.4s ease-in-out infinite}
+.qs-mapprogress__pct{font-family:var(--font-mono);font-size:var(--fs-small);color:var(--ember-400);margin:var(--space-3) 0 0;font-variant-numeric:tabular-nums}
+@keyframes qs-mapprogress-pulse{0%,100%{opacity:0.85;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes qs-mapprogress-slide{0%{transform:translateX(-120%)}100%{transform:translateX(340%)}}
+@media (prefers-reduced-motion:reduce){.qs-mapprogress__film,.qs-mapprogress__fill--indeterminate{animation:none}}
