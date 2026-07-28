@@ -117,6 +117,7 @@ function Promote() {
   const [doneChunks, setDoneChunks] = React.useState(0);
   const [inputWordCount, setInputWordCount] = React.useState(0);
   const streamCleanupRef = React.useRef(null);
+  const chunkBufferRef = React.useRef({});
   const fileRef = React.useRef(null);
 
   React.useEffect(() => () => { if (streamCleanupRef.current) streamCleanupRef.current(); }, []);
@@ -173,6 +174,7 @@ function Promote() {
     setTotalChunks(0);
     setDoneChunks(0);
     setInputWordCount(words);
+    chunkBufferRef.current = {}; // fresh buffer for this run
     setPhase('becoming');
 
     const cleanup = window.QS_API.promoteStream(
@@ -182,27 +184,27 @@ function Promote() {
         onChunk: function(newSegs, done, total, chunkIndex) {
           setTotalChunks(total);
           setDoneChunks(done);
+          // Buffer each chunk's cards under its chunk_index in a ref (survives
+          // re-renders and is never serialized). Chunks arrive out of order
+          // (fastest first), so we sort by index before display or slide 1
+          // shows middle-of-script text.
+          chunkBufferRef.current[chunkIndex] = newSegs.map(toCard);
+          const buffer = chunkBufferRef.current;
+          const ordered = [];
+          Object.keys(buffer)
+            .map(Number)
+            .sort(function(a, b) { return a - b; })
+            .forEach(function(k) { buffer[k].forEach(function(c) { ordered.push(c); }); });
+          // Renumber display indices sequentially in script order
+          ordered.forEach(function(c, i) { c.index = i + 1; });
           setSegs(function(prev) {
-            // Buffer each chunk's segments under its chunk_index, then flatten
-            // in script order. Chunks arrive out of order (fastest first), so
-            // we must sort by chunk_index or slide 1 shows middle-of-script text.
-            const buffer = prev.__buffer || {};
-            buffer[chunkIndex] = newSegs.map(toCard);
-            const ordered = [];
-            Object.keys(buffer)
-              .map(Number)
-              .sort(function(a, b) { return a - b; })
-              .forEach(function(k) { buffer[k].forEach(function(c) { ordered.push(c); }); });
-            // Renumber display indices sequentially in script order
-            ordered.forEach(function(c, i) { c.index = i + 1; });
-            ordered.__buffer = buffer;
             if (prev.length === 0 && ordered.length > 0) setPhase('done');
-            saveLastResult({
-              segs: ordered,
-              groundedBy: grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null,
-              found: {},
-            });
             return ordered;
+          });
+          saveLastResult({
+            segs: ordered,
+            groundedBy: grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null,
+            found: {},
           });
         },
         onDone: function(_title, _runtime) {
