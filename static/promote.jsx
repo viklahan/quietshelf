@@ -164,7 +164,8 @@ function Promote() {
   }
 
   function map() {
-    if (words < QS_MIN_WORDS) {
+    const currentWords = countWords(text);
+    if (currentWords < QS_MIN_WORDS) {
       setError('Paste at least ' + QS_MIN_WORDS + ' words to map your visuals.');
       return;
     }
@@ -175,7 +176,7 @@ function Promote() {
     setGroundedBy(null);
     setTotalChunks(0);
     setDoneChunks(0);
-    setInputWordCount(words);
+    setInputWordCount(currentWords);
     chunkBufferRef.current = {}; // fresh buffer for this run
     setPhase('becoming');
 
