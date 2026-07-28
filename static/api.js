@@ -200,7 +200,7 @@
           if (!line.startsWith('data: ')) continue;
           try {
             const evt = JSON.parse(line.slice(6));
-            if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks);
+            if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks, evt.chunk_index);
             else if (evt.type === 'done') { completed = true; onDone(evt.title, evt.estimated_runtime_seconds); }
             else if (evt.type === 'error') onError(evt.message);
           } catch (e) { /* malformed line, skip */ }

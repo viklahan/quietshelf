@@ -59,6 +59,7 @@ function toCard(seg) {
     clipDurationSeconds: seg.clip_duration_seconds,
     terms: seg.search_terms || [],
     cast: seg.cast || [],
+    needsRemap: !!seg.needs_remap,
   };
 }
 
@@ -178,20 +179,30 @@ function Promote() {
       text,
       grounding,
       {
-        onChunk: function(newSegs, done, total) {
+        onChunk: function(newSegs, done, total, chunkIndex) {
           setTotalChunks(total);
           setDoneChunks(done);
           setSegs(function(prev) {
-            const next = prev.concat(newSegs.map(toCard));
-            /* Switch to results view as soon as first chunk lands —
-               user can start clicking while the rest load in behind them. */
-            if (prev.length === 0 && next.length > 0) setPhase('done');
+            // Buffer each chunk's segments under its chunk_index, then flatten
+            // in script order. Chunks arrive out of order (fastest first), so
+            // we must sort by chunk_index or slide 1 shows middle-of-script text.
+            const buffer = prev.__buffer || {};
+            buffer[chunkIndex] = newSegs.map(toCard);
+            const ordered = [];
+            Object.keys(buffer)
+              .map(Number)
+              .sort(function(a, b) { return a - b; })
+              .forEach(function(k) { buffer[k].forEach(function(c) { ordered.push(c); }); });
+            // Renumber display indices sequentially in script order
+            ordered.forEach(function(c, i) { c.index = i + 1; });
+            ordered.__buffer = buffer;
+            if (prev.length === 0 && ordered.length > 0) setPhase('done');
             saveLastResult({
-              segs: next,
+              segs: ordered,
               groundedBy: grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null,
               found: {},
             });
-            return next;
+            return ordered;
           });
         },
         onDone: function(_title, _runtime) {
@@ -233,6 +244,7 @@ function Promote() {
 
   const doneCount = segs.filter(function(s) { return found[s.index]; }).length;
   const mappedWords = segs.reduce(function(acc, s) { return acc + countWords(s.excerpt); }, 0);
+  const remapCount = segs.filter(function(s) { return s.needsRemap; }).length;
 
   function notionText() {
     return segs.map(function(s) {
@@ -295,6 +307,11 @@ function Promote() {
             </span>
           ) : null}
           <span style={{ flex: 1 }}></span>
+          {!isLoading && remapCount > 0 ? (
+            <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)', color: 'var(--ember-400)', borderColor: 'var(--ember-500)' }} onClick={map}>
+              <QSIcoPromo name="rotate-ccw" size={13} />Remap {remapCount} unmapped
+            </button>
+          ) : null}
           <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={clearAll}>
             <QSIcoPromo name="rotate-ccw" size={13} />New piece
           </button>
@@ -339,6 +356,11 @@ function Promote() {
                   onFoundChange={function(v) { toggle(s.index, v); }}
                 />
                 <div className="qs-casting">
+                  {s.needsRemap ? (
+                    <p className="qs-quiethint" style={{ color: 'var(--ember-400)', margin: '0 0 var(--space-2) 0' }}>
+                      <QSIcoPromo name="circle-alert" size={14} /> The AI couldn't reach this one — these are placeholder words from your text. Hit “Remap” above to try again.
+                    </p>
+                  ) : null}
                   {s.terms.length ? (
                     <a
                       className="qs-casting__link"

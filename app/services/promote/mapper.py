@@ -407,6 +407,7 @@ def _fallback_chunk(chunk: str) -> ChunkResult:
                 search_terms=_keywords(text),
                 clip_duration_seconds=max(2, round(words / 150 * 60)),
                 mood="neutral",
+                needs_remap=True,  # AI didn't map this — flag it for the writer
             )
         )
     return ChunkResult(video_title_suggestion="", segments=segments)
@@ -462,6 +463,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
                     clip_duration_seconds=duration,
                     mood=draft.mood,
                     cast=cast,
+                    needs_remap=getattr(draft, 'needs_remap', False),
                 )
             )
             cumulative += duration

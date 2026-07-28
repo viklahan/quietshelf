@@ -5,6 +5,7 @@ import json
 import logging
 import queue
 import threading
+import time
 
 from pathlib import Path
 
@@ -154,13 +155,27 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
 
     def worker(idx: int, chunk: str) -> None:
         with sem:
-            try:
-                result = _try_map_chunk(chunk, system)
-                if result is None:
-                    result = _fallback_chunk(chunk)
-                result_queue.put((idx, result, None))
-            except Exception as exc:  # noqa: BLE001
-                result_queue.put((idx, None, exc))
+            # Try the AI up to 3 times with backoff before giving up. A chunk
+            # that falls to _fallback_chunk becomes keyword garbage (single-word
+            # padded terms, NEUTRAL mood) — visibly worse than the real mapping.
+            # The waterfall (gemini->groq->cerebras) handles provider failures;
+            # this retry handles the whole waterfall being briefly exhausted.
+            last_exc = None
+            for attempt in range(3):
+                try:
+                    result = _try_map_chunk(chunk, system)
+                    if result is not None:
+                        result_queue.put((idx, result, None))
+                        return
+                    # None = parse failure; retry may get valid JSON
+                    last_exc = None
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+                if attempt < 2:
+                    time.sleep(3.0 * (attempt + 1))  # 3s, 6s backoff
+            # All attempts failed — last resort keyword mapping
+            logger.warning("promote_stream chunk %d exhausted retries: %s", idx, last_exc)
+            result_queue.put((idx, _fallback_chunk(chunk), None))
 
     threads = [threading.Thread(target=worker, args=(i, c), daemon=True) for i, c in enumerate(chunks)]
     for t in threads:
@@ -175,7 +190,7 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
 
         while received < total:
             try:
-                idx, result, exc = result_queue.get(timeout=120)
+                idx, result, exc = result_queue.get(timeout=180)
             except queue.Empty:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Timed out waiting for chunks.'})}\n\n"
                 return
@@ -209,6 +224,7 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                     clip_duration_seconds=duration,
                     mood=draft.mood,
                     cast=cast,
+                    needs_remap=getattr(draft, 'needs_remap', False),
                 )
                 segments_out.append(seg.model_dump())
                 cumulative += duration
