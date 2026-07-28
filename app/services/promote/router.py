@@ -6,7 +6,9 @@ import logging
 import queue
 import threading
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app import config
@@ -22,6 +24,7 @@ from app.services.promote.mapper import (
     _fallback_chunk,
     _ground_segment,
     _mmss,
+    _max_concurrency,
     map_script,
 )
 from app.services.promote.models import PromoteRequest, Segment, ShotList
@@ -30,6 +33,38 @@ from app.services.storymap.grounding import MapParseError, cast_sheet, parse_map
 logger = logging.getLogger("quietshelf.promote")
 
 router = APIRouter(prefix="/api", tags=["promote"])
+
+
+def _extract_text_from_file(filename: str, content: bytes) -> str:
+    """Extract plain text from DOCX, RTF, or TXT file bytes."""
+    ext = Path(filename).suffix.lower()
+    if ext == '.txt':
+        return content.decode('utf-8', errors='ignore')
+    if ext == '.rtf':
+        from striprtf.striprtf import rtf_to_text
+        return rtf_to_text(content.decode('utf-8', errors='ignore'))
+    if ext == '.docx':
+        import io
+        import docx
+        doc = docx.Document(io.BytesIO(content))
+        return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
+    raise HTTPException(status_code=415, detail=f"Unsupported file type '{ext}'. Upload DOCX, RTF, or TXT.")
+
+
+@router.post("/promote/extract")
+async def promote_extract(
+    file: UploadFile = File(...),
+    _: None = Depends(guard),
+):
+    """Extract plain text from an uploaded manuscript file.
+    Returns {text: str, word_count: int} so the frontend can populate
+    the Promote textarea and validate length before streaming.
+    """
+    content = await file.read()
+    text = _extract_text_from_file(file.filename or 'upload', content)
+    text = text.strip()
+    word_count = len(text.split())
+    return {"text": text, "word_count": word_count}
 
 
 @router.post("/promote", response_model=ShotList)

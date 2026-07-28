@@ -100,6 +100,15 @@
     return await resp.json();
   }
 
+  // POST /api/promote/extract -> { text, word_count }
+  async function promoteExtract(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(BASE + '/api/promote/extract', { method: 'POST', body: fd });
+    if (!resp.ok) throw await friendlyError(resp, 'Could not read that file.');
+    return await resp.json();
+  }
+
   // POST /api/promote (JSON) -> ShotList
   // storyMap (optional): the writer's saved Story Map object — grounds every
   // chunk's search terms in the same confirmed cast.
@@ -228,7 +237,7 @@
   }
 
   window.QS_API = {
-    fetchThemes, formatBook, generateBlurb, promote, promoteStream,
+    fetchThemes, formatBook, generateBlurb, promote, promoteStream, promoteExtract,
     getCoverSuggestions, fetchCoverImage,
     storymapScan, storymapMap, storymapImagine,
     health, sendFeedback, calmDelay,

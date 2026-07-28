@@ -126,23 +126,21 @@ function Promote() {
     if (!f) return;
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     if (!['docx', 'rtf', 'txt'].includes(ext)) {
-      setError('I can only read Word (.docx), RTF, or text files. Try one of those?');
+      setError('I can only read Word (.docx), RTF, or plain text files. Try one of those?');
       return;
     }
     setError('');
-    // Read the file text so the word counter and stream both see it
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      setText(ev.target.result || '');
-      setFile(f);
-    };
-    reader.onerror = function() { setError('Could not read that file. Try copying the text directly.'); };
-    // For DOCX we can't read raw text — just store the file and let the backend handle it
-    if (ext === 'docx') {
-      setFile(f);
-    } else {
-      reader.readAsText(f);
-    }
+    setFile(f);
+    // Extract text server-side — handles DOCX, RTF, and TXT correctly
+    window.QS_API.promoteExtract(f).then(function(res) {
+      setText(res.text || '');
+      if ((res.word_count || 0) < QS_MIN_WORDS) {
+        setError('That file looks short — make sure it has at least ' + QS_MIN_WORDS + ' words.');
+      }
+    }).catch(function(err) {
+      setError((err && err.message) || 'Could not read that file. Try copying the text directly.');
+      setFile(null);
+    });
   }
 
   function clearFile() {
