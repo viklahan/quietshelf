@@ -45,36 +45,54 @@ def _max_concurrency() -> int:
 
 
 SYSTEM_PROMPT = """\
-You are a cinematographer's assistant mapping narration to stock footage.
+You are a cinematographer's assistant choosing stock b-roll for a narrated video essay.
 
-You receive a PASSAGE from a narration script. Pace is ~150 words per minute.
+You receive a PASSAGE from the writer's script. The writer has already broken it
+into beats — each LINE is one deliberate narration beat, paced for the video.
+Blank lines separate thought-groups.
 
-Break this passage into visual segments (every 1-3 sentences, wherever the on-screen image should change). For each segment provide:
+YOUR JOB: map b-roll to the writer's beats. Group 1-3 consecutive lines into a
+visual segment wherever the on-screen image should change. Honor the line breaks
+— they are the writer's pacing. Do NOT rewrite or re-paragraph the text.
 
-- script_text: the EXACT sentences from the passage, copied verbatim
-- search_terms: exactly 6 stock-footage search terms that describe what a CAMERA would literally show while these words are spoken. Think: what physical scene, action, or detail would appear on screen? Each term must be 2-5 words describing something filmable.
+These are REFLECTIVE essays about life, feelings, relationships, and inner
+experience — not action stories. The b-roll is mood and symbol, not literal action.
 
-  For each term ask yourself: "Can a camera lens see this?" If yes, include it. If no, rewrite it.
+For each segment provide:
 
-  BAD (abstract, not filmable): "loneliness", "hope", "the weight of memory", "grief"
-  GOOD (filmable): "man sitting alone at kitchen table", "empty chair by window at dusk", "hands folding worn photograph"
+- script_text: the EXACT lines from the passage, copied verbatim (keep them as written)
+- search_terms: exactly 6 stock-footage search terms describing what a CAMERA
+  would show under these words. For reflective essays, think in evocative but
+  FILMABLE images:
 
-  BAD (too vague): "ocean", "city", "rain", "light"
-  GOOD (specific scene): "waves crashing rocky shoreline", "pedestrians crossing wet street night", "raindrops on cafe window close-up"
+  For an essay about achievement feeling hollow: "person staring out window quietly",
+  "empty office after hours desk lamp", "hand setting down trophy on shelf",
+  "person walking alone city sidewalk", "coffee going cold by laptop", "blank
+  ceiling view lying in bed"
 
-  Give 6 terms covering different visual angles: wide establishing shot, medium action, close-up detail, mood/atmosphere, character/subject, environment/setting.
+  For an essay about friendships fading: "two empty chairs cafe table", "phone
+  screen unanswered message", "person scrolling alone on couch night", "old
+  photos scattered on floor", "empty swing moving slightly", "distant figure
+  walking away train platform"
 
-- clip_duration_seconds: integer seconds on screen based on word count at ~150 wpm
-- mood: one or two lowercase words ("tense", "warm", "melancholy", "hopeful", "urgent", "reflective", "somber", "tender")
+  Ask for each term: "Can a camera lens see this?" If it's an abstract noun
+  ("loneliness", "regret", "time"), rewrite it as a filmable scene.
+  Each term MUST be 2-5 words. No single words. No abstractions.
+  Give 6 different angles: wide/atmosphere, medium/subject, close-up/detail,
+  environment, a person in the scene, and an object or symbol.
+
+- clip_duration_seconds: integer seconds on screen, from the line length at ~150 wpm
+- mood: one or two lowercase words ("reflective", "wistful", "hollow", "tender",
+  "melancholy", "quiet", "hopeful", "unsettled", "resigned", "bittersweet")
 
 Also provide:
-- video_title_suggestion: a short working title
+- video_title_suggestion: a short working title from the passage theme
 
 RULES:
-1. Cover EVERY sentence. Never skip or stop early.
-2. script_text = verbatim sentences only.
-3. Every search term = 2-5 words, filmable, specific.
-4. No single-word terms. No abstract nouns.
+1. Cover EVERY line in the passage. Never skip or stop early.
+2. script_text = the writer's exact lines, verbatim.
+3. Every search term = 2-5 words, filmable, specific. No single words, no abstractions.
+4. These are reflective essays — b-roll is mood and symbol, not literal action.
 
 Respond with ONLY valid JSON. No markdown, no commentary.
 """
@@ -102,22 +120,113 @@ _STOPWORDS = set(
 )
 
 
-def _split_sentences(text: str) -> list[str]:
-    """Split text into mappable units. Handles:
-    - Standard sentence endings (.!?)
-    - Paragraph breaks (blank lines) — treated as hard boundaries
-    - Lines that are structural headings (short, no sentence punctuation)
-    Each unit is a non-empty string of prose the AI can map visually.
+def _clean_transcript(text: str) -> tuple[str, str]:
+    """Clean a pasted script or YouTube transcript before mapping.
+
+    Handles the two real input formats the writer uses:
+    1. Pre-production script (DOCX/RTF/paste): title on first line, then one
+       narration beat per line, ellipsis-heavy, blank lines separating thought
+       groups.
+    2. YouTube auto-transcript: [music] tags, timestamp lines (0:00), ALLCAPS
+       section headers jammed inline.
+
+    Returns (cleaned_text, detected_title). Cleaned text preserves the writer's
+    line breaks (each line is a deliberate beat) but strips noise.
     """
-    # First split on paragraph boundaries (two or more newlines)
+    # Strip bracketed tags: [music], [applause], [Music], etc.
+    text = re.sub(r'\[[^\]]{0,40}\]', ' ', text)
+
+    lines = text.split('\n')
+    cleaned: list[str] = []
+    title = ""
+
+    # Timestamp line: "0:00", "1:23", "12:04" possibly with trailing text
+    ts_only = re.compile(r'^\s*\d{1,2}:\d{2}\s*$')
+    ts_prefix = re.compile(r'^\s*\d{1,2}:\d{2}\s+')
+    # ALLCAPS header: mostly uppercase letters, few or no lowercase, no end punctuation
+    allcaps = re.compile(r'^[^a-z]{6,}$')
+
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            cleaned.append('')  # preserve blank-line thought-group boundary
+            continue
+        if ts_only.match(line):
+            continue  # drop pure timestamp lines
+        line = ts_prefix.sub('', line)  # strip leading timestamp on caption lines
+        line = line.strip()
+        if not line:
+            continue
+        # ALLCAPS section header -> keep as its own beat but strip to title case
+        # so it reads as a section marker, not shouted content
+        if allcaps.match(line) and len(line.split()) <= 8:
+            cleaned.append('')  # blank before header = new thought group
+            cleaned.append(line.title())
+            cleaned.append('')
+            continue
+        cleaned.append(line)
+
+    # Detect title: first non-empty line, if short and lacks ending punctuation
+    for i, line in enumerate(cleaned):
+        if line.strip():
+            candidate = line.strip()
+            if len(candidate) < 70 and candidate[-1] not in '.…,?!"\'':
+                title = candidate
+                cleaned[i] = ''  # remove title from mappable content
+            break
+
+    # Collapse runs of 3+ blank lines to at most one
+    result: list[str] = []
+    blank_run = 0
+    for line in cleaned:
+        if not line.strip():
+            blank_run += 1
+            if blank_run <= 1:
+                result.append('')
+        else:
+            blank_run = 0
+            result.append(line)
+
+    return '\n'.join(result).strip(), title
+
+
+def _beats(text: str) -> list[list[str]]:
+    """Split cleaned text into thought-groups of beats.
+
+    Each LINE is one beat (the writer's deliberate pacing). Blank lines are
+    hard boundaries between thought-groups. Returns a list of groups, where
+    each group is a list of beat strings. Footage never cuts across a group
+    boundary (the writer's pause).
+
+    Multi-line ellipsis paragraphs ("planned around…\nwaited for.") that the
+    DOCX reader joined with \n get treated as separate beats — which is right,
+    they ARE separate narration beats.
+    """
+    groups: list[list[str]] = []
+    current: list[str] = []
+    for raw in text.split('\n'):
+        line = raw.strip()
+        if not line:
+            if current:
+                groups.append(current)
+                current = []
+        else:
+            current.append(line)
+    if current:
+        groups.append(current)
+    return groups
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Legacy sentence splitter, kept for the local fallback path only.
+    The main chunker now uses _beats() to honor the writer's line breaks."""
     paragraphs = re.split(r'\n{2,}', text.strip())
     sentences: list[str] = []
     for para in paragraphs:
         para = para.strip()
         if not para:
             continue
-        # Split paragraph into sentences on .!? followed by whitespace
-        parts = re.split(r'(?<=[.!?])\s+', para)
+        parts = re.split(r'(?<=[.!?…])\s+', para)
         for part in parts:
             part = part.strip()
             if part:
@@ -126,19 +235,45 @@ def _split_sentences(text: str) -> list[str]:
 
 
 def _chunk_script(script: str, target_words: int) -> list[str]:
-    """Pack whole sentences into chunks of roughly `target_words` words."""
+    """Group the writer's beats into chunks for the AI, honoring line breaks.
+
+    Each chunk is a set of consecutive beats that:
+    - never crosses a blank-line (thought-group) boundary mid-beat, and
+    - stays under target_words so the JSON response stays small and fast.
+
+    The AI receives beats separated by newlines and is told to map each beat
+    (or tight run of beats) to one visual — preserving the writer's pacing
+    instead of re-segmenting freely.
+    """
+    cleaned, _title = _clean_transcript(script)
+    groups = _beats(cleaned)
+
     chunks: list[str] = []
     current: list[str] = []
     current_words = 0
-    for sentence in _split_sentences(script):
-        words = len(sentence.split())
-        if current and current_words + words > target_words:
-            chunks.append(" ".join(current))
+
+    for group in groups:
+        group_text = '\n'.join(group)
+        group_words = len(group_text.split())
+        # If adding this whole group would blow the target, flush first
+        if current and current_words + group_words > target_words:
+            chunks.append('\n'.join(current))
             current, current_words = [], 0
-        current.append(sentence)
-        current_words += words
+        # A single group larger than target: split it beat-by-beat
+        if group_words > target_words:
+            for beat in group:
+                bw = len(beat.split())
+                if current and current_words + bw > target_words:
+                    chunks.append('\n'.join(current))
+                    current, current_words = [], 0
+                current.append(beat)
+                current_words += bw
+        else:
+            current.extend(group)
+            current_words += group_words
+
     if current:
-        chunks.append(" ".join(current))
+        chunks.append('\n'.join(current))
     return chunks or [script.strip()]
 
 
@@ -284,6 +419,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
     anchor term + cast names for the characters actually mentioned in it."""
     cast_context = cast_sheet(story_map) if story_map else ""
     system = SYSTEM_PROMPT + (CAST_ADDENDUM.format(cast=cast_context) if cast_context else "")
+    _cleaned, detected_title = _clean_transcript(script)
     chunks = _chunk_script(script, CHUNK_TARGET_WORDS)
     logger.info("promote_map chunks=%d grounded=%s", len(chunks), bool(cast_context))
 
@@ -334,7 +470,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
         title = " ".join(segments[0].script_text.split()[:6]).rstrip(".,;:!?")
 
     return ShotList(
-        video_title_suggestion=title or "Your video",
+        video_title_suggestion=detected_title or title or "Your video",
         estimated_runtime_seconds=cumulative,
         segments=segments,
     )

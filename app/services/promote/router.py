@@ -48,7 +48,9 @@ def _extract_text_from_file(filename: str, content: bytes) -> str:
         import io
         import docx
         doc = docx.Document(io.BytesIO(content))
-        return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
+        # Keep blank paragraphs — they are the writer's thought-group boundaries
+        # that the beat chunker relies on. Do NOT filter them out.
+        return '\n'.join(p.text for p in doc.paragraphs)
     raise HTTPException(status_code=415, detail=f"Unsupported file type '{ext}'. Upload DOCX, RTF, or TXT.")
 
 
@@ -132,6 +134,8 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
 
     cast_context = cast_sheet(story_map) if story_map else ""
     system = SYSTEM_PROMPT + (CAST_ADDENDUM.format(cast=cast_context) if cast_context else "")
+    from app.services.promote.mapper import _clean_transcript
+    _cleaned, detected_title = _clean_transcript(body.script)
     chunks = _chunk_script(body.script, CHUNK_TARGET_WORDS)
     total = len(chunks)
     concurrency = min(_max_concurrency(), total)
@@ -212,7 +216,7 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
             # Emit immediately in arrival order — fast and progressive
             yield f"data: {json.dumps({'type': 'chunk', 'chunk_index': idx, 'segments': segments_out, 'chunks_done': received, 'total_chunks': total})}\n\n"
 
-        yield f"data: {json.dumps({'type': 'done', 'title': title or 'Your video', 'estimated_runtime_seconds': chunk_offsets[-1]})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'title': detected_title or title or 'Your video', 'estimated_runtime_seconds': chunk_offsets[-1]})}\n\n"
 
     return StreamingResponse(
         event_stream(),
