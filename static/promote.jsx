@@ -161,7 +161,7 @@ function Promote() {
 
   function map() {
     if (words < QS_MIN_WORDS) {
-      setError('This looks like a fragment. Paste the full piece (at least ' + QS_MIN_WORDS + ' words) for a proper visual map.');
+      setError('Paste at least ' + QS_MIN_WORDS + ' words to map your visuals.');
       return;
     }
     const grounding = useMap && gmap ? gmap : null;
@@ -373,7 +373,7 @@ function Promote() {
 
         {isLoading ? (
           <p className="qs-quiethint" style={{ textAlign: 'center', marginTop: 'var(--space-6)' }}>
-            More segments on their way\u2026
+            More segments on their way{'…'}
           </p>
         ) : (
           <div className="qs-actionrow qs-actionrow--center" style={{ marginTop: 'var(--space-12)' }}>
