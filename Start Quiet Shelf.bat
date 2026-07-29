@@ -3,12 +3,12 @@ setlocal
 title Quiet Shelf
 cd /d "%~dp0"
 
-rem Already running? Just open it.
-powershell -NoProfile -Command "try { Invoke-WebRequest http://127.0.0.1:8090/api/health -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
-if %errorlevel%==0 (
-    echo Quiet Shelf is already running - opening it in your browser.
-    start "" http://127.0.0.1:8090/
-    goto :eof
+rem --- Kill any process already holding port 8090 (stale server) ---
+rem Without this, a crashed or old-code server keeps serving and the app
+rem never picks up updates. Find the PID on 8090 and kill it.
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8090" ^| findstr "LISTENING"') do (
+    echo Stopping old Quiet Shelf ^(PID %%p^)...
+    taskkill /PID %%p /F >nul 2>&1
 )
 
 rem First run: create the Python environment and install dependencies.
@@ -29,6 +29,14 @@ if not exist ".venv\Scripts\python.exe" (
         pause
         goto :eof
     )
+)
+
+rem Make sure required packages are present even on an existing .venv.
+rem Catches the case where requirements.txt gained a dep but .venv is stale.
+".venv\Scripts\python.exe" -c "import docx, striprtf, multipart" >nul 2>&1
+if errorlevel 1 (
+    echo Installing missing dependencies...
+    ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 )
 
 rem A .env is required for the AI provider settings.

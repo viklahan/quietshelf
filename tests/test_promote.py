@@ -36,6 +36,7 @@ def test_endpoint_returns_validated_shape(client, _ok, valid_script):
     assert set(segment) == {
         "id", "script_text", "start_time", "end_time",
         "search_terms", "clip_duration_seconds", "mood", "cast",
+        "needs_remap",  # added: silent-fallback flag (regression R4)
     }
 
 
@@ -138,7 +139,11 @@ def test_short_script_rejected(client):
     assert "100 words" in response.json()["detail"]
 
 
-def test_long_script_rejected(client):
+def test_long_script_rejected(client, monkeypatch):
+    # MAX_WORDS is deliberately uncapped in prod (999999); verify the cap
+    # mechanism still fires by lowering it for this test only.
+    from app import config
+    monkeypatch.setattr(config, "MAX_WORDS", 5000)
     response = client.post("/api/promote", json={"script": "word " * 5001})
     assert response.status_code == 422
     assert "too long" in response.json()["detail"].lower()
