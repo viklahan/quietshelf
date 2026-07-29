@@ -1,0 +1,59 @@
+==============================================================
+  LAYER B — ENDPOINT CONTRACT  (mocked AI)
+  2026-07-28 18:36:17
+==============================================================
+  [PASS] app boots (import app.main)
+  [info] AI layer mocked (deterministic, zero quota)
+
+[B1] /api/health
+  [PASS] health 200 — got 200
+  [PASS] health has provider — {'status': 'ok', 'provider': 'waterfall', 'services': ['format', 'blurb', 'promo
+
+[B2] /api/promote/extract — the browse path
+  [PASS] extract .txt 200 — got 200: {"text":"The morning light came slowly. The morning light came slowly. The morning light came slowly. The morning light 
+  [PASS] extract .txt shape {text,word_count}
+  [PASS] extract .txt count>0 — 200
+  [SKIP] no test .docx found (tests/test_story_9k.docx)
+  [PASS] extract .rtf 200 — got 200
+  [PASS] extract rejects .exe (415) — got 415
+
+[B3] /api/promote/stream — SSE pipeline (mocked AI)
+  [PASS] stream 200 — got 200
+  [PASS] stream meta first — ['meta', 'chunk', 'done']
+  [PASS] stream has chunks — 1 chunk events
+  [PASS] stream done last — ['meta', 'chunk', 'done']
+  [PASS] stream coverage 100% — 540/540 words
+  [PASS] stream order = script order
+  [PASS] stream done has title
+  [info] stream wall time 0.0s
+
+[B4] /api/promote (non-stream) — validation gates
+  [PASS] promote rejects <100 words (422) — got 422
+
+[B5] /api/format — EPUB pipeline (no AI involved)
+  [PASS] format 200 — got 200
+  [PASS] format returns valid EPUB (zip w/ mimetype) — ['mimetype', 'META-INF/container.xml', 'META-INF/com.apple.ibooks.display-options.xml']
+
+[B6] /api/format/cover-suggestions + fetch-cover-image (thumbnail path)
+  [PASS] cover-suggestions 200 + list — 3 results
+  [SKIP] fetch-cover-image (needs --live; avoids external download)
+
+[B7] Regressions (every past bug, permanently)
+  [PASS] R1 waterfall: groq never gets gemini model — groq -> openai/gpt-oss-120b
+  [PASS] R2 chunker: zero lines dropped — 120/120
+  [PASS] R3 title detected from first line — 'A Short Title'
+  [PASS] R4 Segment.needs_remap exists
+  [PASS] R4 ChunkSegment.needs_remap exists
+  [PASS] R5 MIN_WORDS=100 — 100
+  [PASS] R5 MAX_WORDS uncapped — 999999
+  [PASS] R6 permanent failure: exactly 1 call, 0 retries — calls=1
+  [PASS] R6 permanent failure: zero retry sleeps — sleeps=0
+  [PASS] R6 classifier: 401 permanent
+  [PASS] R6 classifier: 402 permanent
+  [PASS] R6 classifier: daily quota permanent
+  [PASS] R6 classifier: 5xx transient
+  [PASS] R6 classifier: per-minute 429 transient
+
+==============================================================
+  LAYER B: GREEN — safe to commit
+==============================================================

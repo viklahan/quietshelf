@@ -302,10 +302,13 @@ def test_map_endpoint_near_empty_input_rejected(client):
     assert response.status_code == 422
 
 
-def test_map_endpoint_too_long_rejected(client):
+def test_map_endpoint_too_long_rejected(client, monkeypatch):
+    # MAX_WORDS is deliberately uncapped in prod (999999); verify the cap
+    # mechanism still fires by lowering it for this test only.
+    from app import config
+    monkeypatch.setattr(config, "MAX_WORDS", 5000)
     response = client.post("/api/storymap/map", data={"text": "word " * 5001})
     assert response.status_code == 422
-    assert "3,000" in response.json()["detail"]
 
 
 def test_map_endpoint_unsupported_file_rejected(client):
@@ -407,10 +410,12 @@ def test_imagine_endpoint_allows_short_input(client, monkeypatch):
     assert response.status_code == 200
 
 
-def test_imagine_endpoint_too_long_rejected(client):
+def test_imagine_endpoint_too_long_rejected(client, monkeypatch):
+    # Same deliberate uncapping as map — test the mechanism, not the old cap.
+    from app import config
+    monkeypatch.setattr(config, "MAX_WORDS", 5000)
     response = client.post("/api/storymap/imagine", data={"text": "word " * 5001, "mode": "full"})
     assert response.status_code == 422
-    assert "3,000" in response.json()["detail"]
 
 
 def test_imagine_endpoint_parse_failure_is_clean_500(client, monkeypatch):

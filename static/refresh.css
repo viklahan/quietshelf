@@ -106,6 +106,14 @@
 @keyframes qs-mapprogress-pulse{0%,100%{opacity:0.85;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
 @keyframes qs-mapprogress-slide{0%{transform:translateX(-120%)}100%{transform:translateX(340%)}}
 @media (prefers-reduced-motion:reduce){.qs-mapprogress__film,.qs-mapprogress__fill--indeterminate{animation:none}}
+/* export dropdown */
+.qs-exportwrap{position:relative;display:inline-flex}
+.qs-exportmenu__scrim{position:fixed;inset:0;z-index:40}
+.qs-exportmenu{position:absolute;top:calc(100% + 6px);right:0;z-index:41;display:flex;flex-direction:column;min-width:190px;background:var(--surface-card);border:var(--border-card);border-radius:var(--radius-sm);box-shadow:0 8px 28px rgba(0,0,0,0.45);padding:4px;animation:qs-exportmenu-in 140ms var(--ease-settle)}
+@keyframes qs-exportmenu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.qs-exportmenu__item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:var(--radius-xs);color:var(--text-body);font-family:inherit;font-size:0.86rem;padding:8px 10px;cursor:pointer;transition:background var(--dur-fast) var(--ease-quiet)}
+.qs-exportmenu__item:hover{background:var(--surface-raised);color:var(--ember-400)}
+@media (prefers-reduced-motion:reduce){.qs-exportmenu{animation:none}}
 /* thumbnail studio */
 .qs-thumbhead{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;margin-bottom:var(--space-8)}
 .qs-thumbrow{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4);flex-wrap:wrap}

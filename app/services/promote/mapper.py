@@ -319,13 +319,17 @@ def _map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult:
     while True:
         try:
             return generate_json(system, chunk, ChunkResult)
-        except ProviderRateLimited:
+        except ProviderRateLimited as e:
+            if getattr(e, "permanent", False):
+                raise  # every provider is dead for the day — retrying is waste
             if rate_retries >= RATE_LIMIT_RETRIES:
                 raise
             rate_retries += 1
             time.sleep(rate_delay)
             rate_delay *= 1.5
-        except ProviderError:  # after ProviderRateLimited - it subclasses this
+        except ProviderError as e:  # after ProviderRateLimited - it subclasses this
+            if getattr(e, "permanent", False):
+                raise  # dead keys / unpaid accounts don't heal in 2 seconds
             if upstream_retries >= 1:
                 raise
             upstream_retries += 1

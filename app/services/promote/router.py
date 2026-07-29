@@ -171,6 +171,11 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                     last_exc = None
                 except Exception as exc:  # noqa: BLE001
                     last_exc = exc
+                    if getattr(exc, "permanent", False):
+                        # Every provider is permanently down (dead keys /
+                        # unpaid / daily quota gone). More retries = more
+                        # minutes of the same errors. Fall back NOW.
+                        break
                 if attempt < 2:
                     time.sleep(3.0 * (attempt + 1))  # 3s, 6s backoff
             # All attempts failed — last resort keyword mapping

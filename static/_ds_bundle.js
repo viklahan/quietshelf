@@ -643,6 +643,7 @@ function ManuscriptCard({
   clipDurationSeconds,
   terms = [],
   onTermChange,
+  termHref,
   found = false,
   onFoundChange,
   style,
@@ -673,6 +674,7 @@ function ManuscriptCard({
     key: i,
     term: term,
     best: i === 0,
+    href: termHref ? termHref(term) : undefined,
     onTermChange: onTermChange ? (v => onTermChange(i, v)) : undefined
   }))), /*#__PURE__*/React.createElement(__ds_scope.FoundCheckbox, {
     checked: found,

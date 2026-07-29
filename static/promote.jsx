@@ -118,9 +118,36 @@ function Promote() {
   const [inputWordCount, setInputWordCount] = React.useState(0);
   const [showThumbnail, setShowThumbnail] = React.useState(false);
   const [mapTitle, setMapTitle] = React.useState('');
+  const [remapBusy, setRemapBusy] = React.useState(false);
+  const [exportOpen, setExportOpen] = React.useState(false);
   const streamCleanupRef = React.useRef(null);
   const chunkBufferRef = React.useRef({});
   const fileRef = React.useRef(null);
+  // Smooth progress: chunk completions are the only REAL events, but they can
+  // be 30-60s apart (free-tier AI). Between events the bar advances on a
+  // per-chunk time estimate, capped below the next real tick so it never lies.
+  const [, forceTick] = React.useState(0);
+  const runStartRef = React.useRef(0);        // when this map started
+  const lastEventRef = React.useRef(0);       // when the last chunk landed
+  const chunkEstRef = React.useRef(35);       // seconds per chunk-wave (adapts)
+
+  const mappingActive = totalChunks > 0 && doneChunks < totalChunks;
+  React.useEffect(function() {
+    if (!(phase === 'becoming' || mappingActive)) return;
+    const id = setInterval(function() { forceTick(function(t) { return t + 1; }); }, 400);
+    return function() { clearInterval(id); };
+  }, [phase, mappingActive]);
+
+  function smoothPct() {
+    if (totalChunks <= 0) return 0;
+    const base = doneChunks / totalChunks;
+    if (doneChunks >= totalChunks) return 100;
+    // How far through the in-flight wave are we, by time?
+    const since = (Date.now() - (lastEventRef.current || runStartRef.current)) / 1000;
+    const waveShare = Math.min(2, totalChunks - doneChunks) / totalChunks; // concurrency 2
+    const partial = Math.min(since / chunkEstRef.current, 0.92) * waveShare;
+    return Math.min(99, Math.round((base + partial) * 100));
+  }
 
   React.useEffect(() => () => { if (streamCleanupRef.current) streamCleanupRef.current(); }, []);
 
@@ -178,6 +205,9 @@ function Promote() {
     setDoneChunks(0);
     setInputWordCount(currentWords);
     chunkBufferRef.current = {}; // fresh buffer for this run
+    runStartRef.current = Date.now();
+    lastEventRef.current = 0;
+    chunkEstRef.current = 35; // reset the per-chunk estimate each run
     setPhase('becoming');
 
     const cleanup = window.QS_API.promoteStream(
@@ -187,6 +217,13 @@ function Promote() {
         onChunk: function(newSegs, done, total, chunkIndex) {
           setTotalChunks(total);
           setDoneChunks(done);
+          // Real event: re-anchor the smooth bar and adapt the estimate to
+          // how long chunks are ACTUALLY taking this run.
+          lastEventRef.current = Date.now();
+          if (done > 0) {
+            const measured = (Date.now() - runStartRef.current) / 1000 / done;
+            chunkEstRef.current = Math.max(8, Math.min(90, measured));
+          }
           // Buffer each chunk's cards under its chunk_index in a ref (survives
           // re-renders and is never serialized). Chunks arrive out of order
           // (fastest first), so we sort by index before display or slide 1
@@ -261,6 +298,94 @@ function Promote() {
     }).join('\n');
   }
 
+  function remapUnmapped() {
+    // Contiguous runs of needs-remap cards; each run was one failed AI chunk.
+    // Remap ONLY those runs — never the whole script again.
+    if (remapBusy) return;
+    const runs = [];
+    segs.forEach(function(s, i) {
+      if (s.needsRemap) {
+        const last = runs[runs.length - 1];
+        if (last && last.start + last.cards.length === i) last.cards.push(s);
+        else runs.push({ start: i, cards: [s] });
+      }
+    });
+    if (!runs.length) return;
+    const eligible = runs.filter(function(r) {
+      return countWords(r.cards.map(function(c) { return c.excerpt; }).join(' ')) >= QS_MIN_WORDS;
+    });
+    if (!eligible.length) {
+      setError('Those segments are too short to remap on their own \u2014 use \u201cNew piece\u201d to re-run the whole script.');
+      return;
+    }
+    setRemapBusy(true);
+    setError('');
+    let ri = 0;
+    function nextRun() {
+      if (ri >= eligible.length) { setRemapBusy(false); return; }
+      const run = eligible[ri++];
+      // Sacrificial first line: the mapper's title detector absorbs it, so the
+      // run's real first beat can never be eaten as a "title".
+      const joined = 'Remap pass\n\n' + run.cards.map(function(c) { return c.excerpt; }).join('\n');
+      const buffer = {};
+      window.QS_API.promoteStream(joined, null, {
+        onChunk: function(newSegs, _d, _t, chunkIndex) { buffer[chunkIndex] = newSegs.map(toCard); },
+        onDone: function(_title) {
+          const fresh = [];
+          Object.keys(buffer).map(Number).sort(function(a, b) { return a - b; })
+            .forEach(function(k) { buffer[k].forEach(function(c) { fresh.push(c); }); });
+          if (fresh.length) {
+            setSegs(function(prev) {
+              // Locate the run by its first card (indices may have shifted)
+              const at = prev.findIndex(function(s) { return s.needsRemap && s.excerpt === run.cards[0].excerpt; });
+              if (at === -1) return prev;
+              const out = prev.slice(0, at).concat(fresh, prev.slice(at + run.cards.length));
+              out.forEach(function(c, i) { c.index = i + 1; });
+              saveLastResult({ segs: out, groundedBy: groundedBy, found: found });
+              return out;
+            });
+          }
+          nextRun();
+        },
+        onError: function(msg) {
+          setError(msg || 'Remap failed \u2014 try again in a minute.');
+          setRemapBusy(false);
+        },
+      });
+    }
+    nextRun();
+  }
+
+  function downloadFile(name, mime, content) {
+    const blob = new Blob([content], { type: mime });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function exportBase() {
+    return (mapTitle || 'shot-list').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'shot-list';
+  }
+  function exportNotion() {
+    downloadFile(exportBase() + '.md', 'text/markdown',
+      (mapTitle ? '# ' + mapTitle + '\n\n' : '') + notionText());
+  }
+  function csvEscape(v) {
+    v = String(v == null ? '' : v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function exportCsv() {
+    const rows = [['#', 'Start', 'End', 'Excerpt', 'Mood', 'Clip (s)', 'Search terms', 'Found']];
+    segs.forEach(function(s) {
+      rows.push([s.index, s.startTime, s.endTime, s.excerpt, s.mood, s.clipDurationSeconds, s.terms.join(' / '), found[s.index] ? 'yes' : '']);
+    });
+    downloadFile(exportBase() + '.csv', 'text/csv',
+      rows.map(function(r) { return r.map(csvEscape).join(','); }).join('\n'));
+  }
+
   function clearAll() {
     setPhase('compose');
     setFound({});
@@ -273,7 +398,7 @@ function Promote() {
   }
 
   if (phase === 'becoming') {
-    const pct = totalChunks > 0 ? Math.round((doneChunks / totalChunks) * 100) : 0;
+    const pct = smoothPct();
     const barLabel = totalChunks > 0
       ? 'Mapping segment ' + (doneChunks + 1) + ' of ' + totalChunks
       : 'Reading your piece\u2026';
@@ -337,8 +462,8 @@ function Promote() {
           ) : null}
           <span style={{ flex: 1 }}></span>
           {!isLoading && remapCount > 0 ? (
-            <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)', color: 'var(--ember-400)', borderColor: 'var(--ember-500)' }} onClick={map}>
-              <QSIcoPromo name="rotate-ccw" size={13} />Remap {remapCount} unmapped
+            <button type="button" className="qs-payoff__again" disabled={remapBusy} style={{ marginRight: 'var(--space-3)', color: 'var(--ember-400)', borderColor: 'var(--ember-500)' }} onClick={remapUnmapped}>
+              <QSIcoPromo name="rotate-ccw" size={13} />{remapBusy ? 'Remapping\u2026' : 'Remap ' + remapCount + ' unmapped'}
             </button>
           ) : null}
           {!isLoading && segs.length > 0 ? (
@@ -349,7 +474,27 @@ function Promote() {
           <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={clearAll}>
             <QSIcoPromo name="rotate-ccw" size={13} />New piece
           </button>
-          <CopyButton text={notionText()} label="Copy for Notion" />
+          <span className="qs-exportwrap">
+            <button type="button" className="qs-payoff__again" aria-haspopup="menu" aria-expanded={exportOpen}
+              onClick={function() { setExportOpen(function(o) { return !o; }); }}>
+              <QSIcoPromo name="download" size={13} />Export<QSIcoPromo name="chevron-down" size={12} />
+            </button>
+            {exportOpen ? (
+              <React.Fragment>
+                <span className="qs-exportmenu__scrim" onClick={function() { setExportOpen(false); }}></span>
+                <span className="qs-exportmenu" role="menu">
+                  <button type="button" role="menuitem" className="qs-exportmenu__item"
+                    onClick={function() { setExportOpen(false); exportNotion(); }}>
+                    <QSIcoPromo name="file-text" size={13} />For Notion (.md)
+                  </button>
+                  <button type="button" role="menuitem" className="qs-exportmenu__item"
+                    onClick={function() { setExportOpen(false); exportCsv(); }}>
+                    <QSIcoPromo name="table" size={13} />Spreadsheet (.csv)
+                  </button>
+                </span>
+              </React.Fragment>
+            ) : null}
+          </span>
         </div>
 
         <div className="qs-groundrow" role="radiogroup" aria-label="Video source">
@@ -385,6 +530,10 @@ function Promote() {
                   moodTone={s.moodTone}
                   clipDurationSeconds={s.clipDurationSeconds}
                   terms={s.terms}
+                  termHref={function(t) {
+                    const site = QS_VIDEO_SITES.find(function(x) { return x.id === videoSite; }) || QS_VIDEO_SITES[0];
+                    return site.url(t, orientationParam(orientation));
+                  }}
                   onTermChange={function(ti, v) { editTerm(idx, ti, v); }}
                   found={!!found[s.index]}
                   onFoundChange={function(v) { toggle(s.index, v); }}
@@ -430,9 +579,9 @@ function Promote() {
         {isLoading ? (
           <div style={{ marginTop: 'var(--space-6)' }}>
             <div className="qs-mapprogress__track" style={{ maxWidth: '440px', margin: '0 auto' }}
-              role="progressbar" aria-valuenow={Math.round((doneChunks / totalChunks) * 100)}
+              role="progressbar" aria-valuenow={smoothPct()}
               aria-valuemin={0} aria-valuemax={100} aria-label="Mapping progress">
-              <div className="qs-mapprogress__fill" style={{ width: Math.round((doneChunks / totalChunks) * 100) + '%' }}></div>
+              <div className="qs-mapprogress__fill" style={{ width: smoothPct() + '%' }}></div>
             </div>
             <p className="qs-quiethint" style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
               Mapping segment {doneChunks} of {totalChunks} — more on their way{'…'}

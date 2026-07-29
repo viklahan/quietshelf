@@ -18,6 +18,14 @@ import time
 import zipfile
 from pathlib import Path
 
+# Windows consoles default to cp1252 — force UTF-8 so unicode in test
+# names/details never crashes the harness itself.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 LIVE = "--live" in sys.argv
@@ -167,7 +175,9 @@ log("\n[B5] /api/format — EPUB pipeline (no AI involved)")
 r = client.post("/api/format",
     data={"title": "Test Book", "author": "QS Harness", "theme": "classic"},
     files={"file": ("book.txt", ("Chapter One\n\n" + txt_script).encode(), "text/plain")})
-result("format 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+# NOTE: on success the body is BINARY EPUB — never print it (cp1252 crash)
+_detail = f"got {r.status_code}" + ("" if r.status_code == 200 else f": {r.text[:120]}")
+result("format 200", r.status_code == 200, _detail)
 if r.status_code == 200:
     try:
         zf = zipfile.ZipFile(io.BytesIO(r.content))
@@ -227,6 +237,41 @@ result("R4 ChunkSegment.needs_remap exists", "needs_remap" in _CSeg.model_fields
 # R5: MIN/MAX words config (the paste-cap bug)
 result("R5 MIN_WORDS=100", _cfg.MIN_WORDS == 100, str(_cfg.MIN_WORDS))
 result("R5 MAX_WORDS uncapped", _cfg.MAX_WORDS >= 999999, str(_cfg.MAX_WORDS))
+
+# R6: fail-fast on permanently-dead providers (the 40s-of-retries bug).
+# A ProviderError flagged permanent must skip ALL retry sleeps.
+from app.providers import ProviderError as _PErr
+from app.services.promote import mapper as _m2
+_calls = {"n": 0}
+def _always_dead(system, user, model):
+    _calls["n"] += 1
+    e = _PErr("All waterfall providers failed: groq: 401; cerebras: 402")
+    e.permanent = True
+    raise e
+_orig_gj = _m2.generate_json
+_orig_sleep = _m2.time.sleep
+_slept = {"n": 0}
+_m2.generate_json = _always_dead
+_m2.time.sleep = lambda s: _slept.__setitem__("n", _slept["n"] + 1)
+try:
+    t_ff = time.time()
+    try:
+        _m2._map_chunk("some chunk text here")
+    except _PErr:
+        pass
+    result("R6 permanent failure: exactly 1 call, 0 retries", _calls["n"] == 1, f"calls={_calls['n']}")
+    result("R6 permanent failure: zero retry sleeps", _slept["n"] == 0, f"sleeps={_slept['n']}")
+finally:
+    _m2.generate_json = _orig_gj
+    _m2.time.sleep = _orig_sleep
+
+# R6b: the waterfall classifier itself
+from app.providers.waterfall import _is_permanent_failure as _ipf
+result("R6 classifier: 401 permanent", _ipf("Groq API error: AuthenticationError"))
+result("R6 classifier: 402 permanent", _ipf("Error code: 402 - payment_required"))
+result("R6 classifier: daily quota permanent", _ipf("quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier"))
+result("R6 classifier: 5xx transient", not _ipf("upstream 500 internal server error"))
+result("R6 classifier: per-minute 429 transient", not _ipf("429 too many requests, retry in 12s"))
 
 # ============================================================================
 log("\n" + "=" * 62)

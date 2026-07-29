@@ -47,6 +47,21 @@ def _build_provider(name: str):
         return None
 
 
+def _is_permanent_failure(msg: str) -> bool:
+    """True for failures that cannot heal within a request's retry window:
+    dead keys (401), unpaid accounts (402), and exhausted DAILY quotas.
+    Per-minute 429s and upstream 5xx are transient and stay retryable."""
+    m = msg.lower()
+    if "unauthorized" in m or "authenticationerror" in m or "401" in m:
+        return True
+    if "payment_required" in m or "payment required" in m or "402" in m:
+        return True
+    # Gemini daily free-tier exhaustion names the per-day quota explicitly
+    if "perday" in m or "free_tier_requests" in m:
+        return True
+    return False
+
+
 class WaterfallProvider(Provider):
     name = "waterfall"
 
@@ -65,6 +80,8 @@ class WaterfallProvider(Provider):
         call_len = len(system_prompt) + len(user_content)
         errors: list[str] = []
 
+        permanent_flags: list[bool] = []
+
         for name in order:
             if name == "cerebras" and call_len > CEREBRAS_CONTEXT_LIMIT:
                 logger.info("waterfall: skipping cerebras (too large: %d chars)", call_len)
@@ -82,12 +99,21 @@ class WaterfallProvider(Provider):
                 msg = f"{name}: rate-limited ({e})"
                 logger.warning("waterfall: %s — trying next", msg)
                 errors.append(msg)
+                permanent_flags.append(_is_permanent_failure(str(e)))
             except ProviderError as e:
                 msg = f"{name}: error ({e})"
                 logger.warning("waterfall: %s — trying next", msg)
                 errors.append(msg)
+                permanent_flags.append(_is_permanent_failure(str(e)))
 
-        raise ProviderError(
+        exc = ProviderError(
             "All waterfall providers failed: " + "; ".join(errors) if errors
             else "No providers configured."
         )
+        # When EVERY leg died a permanent death (dead key, unpaid account,
+        # exhausted DAILY quota), retrying in seconds is pure waste — flag it
+        # so callers skip their retry loops and fall back immediately.
+        exc.permanent = bool(permanent_flags) and all(permanent_flags)
+        if exc.permanent:
+            logger.warning("waterfall: all providers permanently unavailable — callers should not retry")
+        raise exc
