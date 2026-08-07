@@ -8,9 +8,10 @@ const QS_TABS = [
   { id: 'blurb', label: 'Blurb', icon: 'feather' },
   { id: 'promote', label: 'Promote', icon: 'film' },
   { id: 'storymap', label: 'Story Map', icon: 'search' },
+  { id: 'scout', label: 'Scout', icon: 'sparkles' },
 ];
 
-const QS_VALID_TABS = ['home', 'format', 'blurb', 'promote', 'storymap', 'about'];
+const QS_VALID_TABS = ['home', 'format', 'blurb', 'promote', 'storymap', 'scout', 'about'];
 
 function tabFromLocation() {
   const hash = window.location.hash.replace('#', '');
@@ -48,6 +49,7 @@ function App() {
   else if (tab === 'blurb') view = <window.Blurb />;
   else if (tab === 'promote') view = <window.Promote />;
   else if (tab === 'storymap') view = <window.StoryMapPage />;
+  else if (tab === 'scout') view = <window.ScoutPage />;
   else if (tab === 'about') view = <window.About onNavigate={navigateTo} />;
 
   return (

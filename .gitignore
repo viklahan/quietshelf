@@ -11,12 +11,30 @@ venv/
 
 *.egg-info/
 
-# Local uvicorn run logs
+# Local uvicorn run logs (these embed local filesystem paths -- keep them out
+# of a public repo)
 _ui_out.log
 _ui_err.log
+_live.log
+
+# Local test run output (embeds local interpreter paths)
+/tests/test-run.log
+/tests/test-report.log
 
 # Playwright MCP run artifacts
 .playwright-mcp/
+/*.png
+
+# Scout harvest snapshots (runtime output, regenerated on demand)
+/data/
+
+# Local-only runbook: production infra detail, deliberately not published
+/DEPLOY.local.md
+
+# Design-handoff zips. Their contents are already extracted into static/, so
+# committing them would duplicate several MB into a public repo. The .dc.html
+# mockups and drop-in files in those folders ARE committed.
+/Quiet Shelf Design Handoff/design_handoff_quiet_shelf/*/*.zip
 
 # Local screenshots / captures (kept out of the repo, not deleted)
 /storymap-live.png

@@ -1,8 +1,8 @@
 /* Quiet Shelf — Thumbnail Studio.
    Opens after Promote maps a script. Composites a 1280x720 YouTube thumbnail:
    a person photo (stock search or upload) + a short punchy hook in bold
-   all-caps Anton, in one of three layouts modeled on the writer's real
-   Quiet Fight Club thumbnails. Exports PNG at exact YouTube spec.
+   all-caps Anton that the writer can DRAG anywhere on the image. Exports PNG
+   at exact YouTube spec.
 
    Everything is canvas-local: uploaded photos never leave the browser, and
    stock photos are fetched as Blobs through the app's own proxy
@@ -73,6 +73,14 @@ const QS_EMOTION_POOLS = {
     'person calm gaze editorial photo',
   ],
 };
+
+// Visual modifiers crossed with the pools give ~48 distinct queries before
+// any repeat — the API's same-top-hits problem needs different WORDS, not
+// just different clicks.
+const QS_QUERY_MODIFIERS = [
+  '', 'cinematic', 'black and white', 'golden hour', 'close up',
+  'side profile', 'over shoulder', 'natural light',
+];
 
 function emotionPool(mood) {
   const m = (mood || '').toLowerCase();
@@ -158,16 +166,19 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 function drawHeadline(ctx, text, opts) {
-  const align = opts.align || 'left';
   const accent = opts.accent || null;
-  const boxX = opts.boxX;
-  const boxW = opts.boxW;
-  const anchorY = opts.anchorY;
-  const maxLines = opts.maxLines || 3;
+  // Position as fractions of the frame; the text block CENTERS vertically on
+  // ty and starts horizontally at tx.
+  const tx = opts.tx * QS_THUMB_W;
+  const ty = opts.ty * QS_THUMB_H;
+  const boxW = Math.max(280, Math.min(QS_THUMB_W * 0.60, QS_THUMB_W - tx - 48));
+  const maxLines = 3;
 
-  let size = opts.maxSize || 120;
+  const scale = opts.scale || 1;
+  let size = Math.round(120 * scale);
   let lines = [];
-  for (; size >= 40; size -= 4) {
+  const minSize = Math.max(28, Math.round(40 * scale * 0.6));
+  for (; size >= minSize; size -= 4) {
     ctx.font = '400 ' + size + 'px Anton, Impact, sans-serif';
     lines = wrapText(ctx, text, boxW);
     if (lines.length <= maxLines) break;
@@ -175,19 +186,39 @@ function drawHeadline(ctx, text, opts) {
   ctx.font = '400 ' + size + 'px Anton, Impact, sans-serif';
   const lineH = size * 1.04;
   const totalH = lineH * lines.length;
-  let y = anchorY - totalH / 2 + size * 0.82;
+  let widest = 0;
+  lines.forEach(function (ln) { widest = Math.max(widest, ctx.measureText(ln).width); });
 
-  ctx.textAlign = align;
+  // Local legibility scrim: a soft dark panel behind the text, wherever it is
+  // dragged — so the hook never fights the face for contrast.
+  // roundRect shipped ~2023; square-corner fallback for older browsers.
+  if (!ctx.roundRect) { ctx.roundRect = function (x, y, w, h) { ctx.rect(x, y, w, h); }; }
+  const pad = size * 0.35;
+  const bx = tx - pad, by = ty - totalH / 2 - pad;
+  const bw = Math.min(widest, boxW) + pad * 2, bh = totalH + pad * 1.6;
+  ctx.save();
+  ctx.fillStyle = 'rgba(8,7,6,0.34)';
+  ctx.filter = 'blur(0px)';
+  ctx.beginPath();
+  const r = 14;
+  ctx.roundRect(bx - 8, by - 8, bw + 16, bh + 16, r + 6);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(8,7,6,0.30)';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw, bh, r);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  const drawX = align === 'center' ? boxX + boxW / 2 : boxX;
-
+  let y = ty - totalH / 2 + size * 0.82;
   lines.forEach(function (ln) {
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
     ctx.shadowBlur = 18;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 4;
     ctx.fillStyle = '#f7f4ef';
-    ctx.fillText(ln, drawX, y);
+    ctx.fillText(ln, tx, y);
     y += lineH;
   });
   ctx.shadowColor = 'transparent';
@@ -197,53 +228,34 @@ function drawHeadline(ctx, text, opts) {
   if (accent) {
     const lastW = Math.min(boxW, ctx.measureText(lines[lines.length - 1]).width);
     const uy = y - lineH + size * 0.16;
-    const ux = align === 'center' ? drawX - lastW / 2 : drawX;
     ctx.fillStyle = accent;
-    ctx.fillRect(ux, uy, Math.max(120, lastW * 0.42), Math.max(6, size * 0.06));
+    ctx.fillRect(tx, uy, Math.max(120, lastW * 0.42), Math.max(6, size * 0.06));
   }
+
+  // Report the hit box (canvas pixels) for dragging.
+  return { x: bx, y: by, w: bw, h: bh };
 }
 
-const QS_THUMB_LAYOUTS = [
-  {
-    id: 'text-left',
-    name: 'Text left',
-    paint: function (ctx, img, hook, accent) {
-      drawCover(ctx, img, 0.82);
-      drawScrim(ctx, 'left');
-      drawHeadline(ctx, hook, {
-        align: 'left', accent: accent,
-        boxX: 70, boxW: QS_THUMB_W * 0.50, anchorY: QS_THUMB_H * 0.5,
-        maxSize: 128, maxLines: 3,
-      });
-    },
-  },
-  {
-    id: 'lower-left',
-    name: 'Lower third',
-    paint: function (ctx, img, hook, accent) {
-      drawCover(ctx, img, 0.5);
-      drawScrim(ctx, 'bottom');
-      drawHeadline(ctx, hook, {
-        align: 'left', accent: accent,
-        boxX: 70, boxW: QS_THUMB_W * 0.62, anchorY: QS_THUMB_H * 0.74,
-        maxSize: 112, maxLines: 2,
-      });
-    },
-  },
-  {
-    id: 'center-band',
-    name: 'Center band',
-    paint: function (ctx, img, hook, accent) {
-      drawCover(ctx, img, 0.78);
-      drawScrim(ctx, 'center');
-      drawHeadline(ctx, hook, {
-        align: 'left', accent: accent,
-        boxX: 70, boxW: QS_THUMB_W * 0.52, anchorY: QS_THUMB_H * 0.5,
-        maxSize: 120, maxLines: 3,
-      });
-    },
-  },
-];
+function paintThumb(ctx, img, hook, accent, tx, ty, scale, withHandle) {
+  drawCover(ctx, img, 0.78);
+  drawScrim(ctx, ty > 0.62 ? 'bottom' : 'left');
+  const bbox = drawHeadline(ctx, hook || ' ', { accent: accent, tx: tx, ty: ty, scale: scale || 1 });
+  if (withHandle && bbox) {
+    // Corner grip: preview-only affordance for resizing. The export path
+    // repaints WITHOUT it, so it can never leak into the PNG.
+    const hx = bbox.x + bbox.w, hy = bbox.y + bbox.h;
+    ctx.save();
+    ctx.fillStyle = 'rgba(197,137,59,0.95)';
+    ctx.strokeStyle = 'rgba(8,7,6,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  return bbox;
+}
 
 const QS_THUMB_ACCENTS = [
   { id: 'oxblood', label: 'Red', hex: '#c0392b' },
@@ -276,25 +288,79 @@ function ThumbnailStudio(props) {
   const [error, setError] = React.useState('');
   const uploadRef = React.useRef(null);
   const queryIdxRef = React.useRef(0);           // which pool phrasing to use next
-  const seenUrlsRef = React.useRef(new Set());   // photos already shown, to avoid repeats
-  const canvasRefs = [React.useRef(null), React.useRef(null), React.useRef(null)];
+  const shownCountRef = React.useRef({});        // url -> times displayed (cap: 2 per mapping)
+  const canvasRef = React.useRef(null);          // the single preview canvas
+  const bboxRef = React.useRef(null);            // last drawn text hit-box (canvas px)
+  const dragRef = React.useRef(null);            // {mode, ...} while dragging/resizing
+  const [textPos, setTextPos] = React.useState({ tx: 0.055, ty: 0.5 });
+  const [textScale, setTextScale] = React.useState(1);
 
   const accent = (QS_THUMB_ACCENTS.find(function (a) { return a.id === accentId; }) || {}).hex || null;
 
   React.useEffect(function () {
     if (!photoImg) return;
-    QS_THUMB_LAYOUTS.forEach(function (layout, i) {
-      const canvas = canvasRefs[i].current;
-      if (!canvas) return;
-      canvas.width = QS_THUMB_W;
-      canvas.height = QS_THUMB_H;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, QS_THUMB_W, QS_THUMB_H);
-      try {
-        layout.paint(ctx, photoImg, hook || ' ', accent);
-      } catch (e) {}
-    });
-  }, [photoImg, hook, accentId]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = QS_THUMB_W;
+    canvas.height = QS_THUMB_H;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, QS_THUMB_W, QS_THUMB_H);
+    try {
+      bboxRef.current = paintThumb(ctx, photoImg, hook, accent, textPos.tx, textPos.ty, textScale, true);
+    } catch (e) {}
+  }, [photoImg, hook, accentId, textPos, textScale]);
+
+  // Drag the hook anywhere on the image. Pointer events cover mouse + touch.
+  function canvasPoint(e) {
+    const canvas = canvasRef.current;
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * (QS_THUMB_W / r.width),
+      y: (e.clientY - r.top) * (QS_THUMB_H / r.height),
+    };
+  }
+  function onCanvasPointerDown(e) {
+    const b = bboxRef.current;
+    if (!b) return;
+    const pt = canvasPoint(e);
+    const hx = b.x + b.w, hy = b.y + b.h;
+    const nearHandle = Math.hypot(pt.x - hx, pt.y - hy) <= 30;
+    if (nearHandle) {
+      dragRef.current = {
+        mode: 'resize',
+        startScale: textScale,
+        anchorX: textPos.tx * QS_THUMB_W,
+        anchorY: textPos.ty * QS_THUMB_H,
+        startDist: Math.max(40, Math.hypot(pt.x - textPos.tx * QS_THUMB_W, pt.y - textPos.ty * QS_THUMB_H)),
+      };
+    } else if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) {
+      dragRef.current = {
+        mode: 'move',
+        dx: pt.x - textPos.tx * QS_THUMB_W,
+        dy: pt.y - textPos.ty * QS_THUMB_H,
+      };
+    } else {
+      return;
+    }
+    e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+  function onCanvasPointerMove(e) {
+    const d = dragRef.current;
+    if (!d) return;
+    const pt = canvasPoint(e);
+    if (d.mode === 'resize') {
+      const dist = Math.max(40, Math.hypot(pt.x - d.anchorX, pt.y - d.anchorY));
+      const next = d.startScale * (dist / d.startDist);
+      setTextScale(Math.min(1.7, Math.max(0.45, next)));
+    } else {
+      setTextPos({
+        tx: Math.min(0.85, Math.max(0.02, (pt.x - d.dx) / QS_THUMB_W)),
+        ty: Math.min(0.92, Math.max(0.08, (pt.y - d.dy) / QS_THUMB_H)),
+      });
+    }
+  }
+  function onCanvasPointerUp() { dragRef.current = null; }
 
   React.useEffect(function () {
     if (document.fonts && document.fonts.ready) {
@@ -308,16 +374,33 @@ function ThumbnailStudio(props) {
     setLoadingPeople(true);
     setError('');
     const pool = emotionPool(mood);
-    // Pick the next phrasing in the pool, wrapping around.
-    const query = pool[queryIdxRef.current % pool.length];
+    // Cross pool phrasing with a visual modifier: ~48 distinct queries before
+    // any wording repeats, so the API keeps surfacing different photos.
+    const i = queryIdxRef.current;
     queryIdxRef.current += 1;
-    window.QS_API.thumbnailPeople({ emotion: query, n: 8 })
+    const base = pool[i % pool.length];
+    const modifier = QS_QUERY_MODIFIERS[Math.floor(i / pool.length) % QS_QUERY_MODIFIERS.length];
+    const query = (base + ' ' + modifier).trim();
+    window.QS_API.thumbnailPeople({ emotion: query, n: 12 })
       .then(function (res) {
         const all = (res.suggestions || []).filter(function (s) { return s && (s.thumb_url || s.url); });
-        // Prefer photos we haven't shown yet this session.
-        const fresh = all.filter(function (s) { return !seenUrlsRef.current.has(s.url || s.thumb_url); });
-        const list = (fresh.length ? fresh : all).slice(0, 6);
-        list.forEach(function (s) { seenUrlsRef.current.add(s.url || s.thumb_url); });
+        const counts = shownCountRef.current;
+        const keyOf = function (s) { return s.url || s.thumb_url; };
+        // Hard rule: no photo appears more than TWICE per mapping session.
+        // Prefer never-shown, then once-shown; twice-shown are excluded.
+        const never = all.filter(function (s) { return !(counts[keyOf(s)] > 0); });
+        const once = all.filter(function (s) { return counts[keyOf(s)] === 1; });
+        let list = never.concat(once).slice(0, 6);
+        if (!list.length && all.length) {
+          // Genuinely out of photos under the cap: start a fresh session count
+          // rather than showing an empty grid.
+          shownCountRef.current = {};
+          list = all.slice(0, 6);
+        }
+        list.forEach(function (s) {
+          const k = keyOf(s);
+          shownCountRef.current[k] = (shownCountRef.current[k] || 0) + 1;
+        });
         setPeople(list);
         if (!list.length) setError('No photos came back - try again or upload your own.');
       })
@@ -347,19 +430,27 @@ function ThumbnailStudio(props) {
       .finally(function () { setBusy(false); });
   }
 
-  function download(i) {
-    const canvas = canvasRefs[i].current;
-    if (!canvas) return;
+  function download() {
+    const canvas = canvasRef.current;
+    if (!canvas || !photoImg) return;
+    // Repaint WITHOUT the resize handle so it never ships in the PNG.
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, QS_THUMB_W, QS_THUMB_H);
+    paintThumb(ctx, photoImg, hook, accent, textPos.tx, textPos.ty, textScale, false);
     canvas.toBlob(function (blob) {
       if (!blob) { setError('Export failed - try a different photo.'); return; }
       const a = document.createElement('a');
       const safe = (hook || 'thumbnail').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-      a.download = 'thumbnail-' + (safe || 'quietshelf') + '-' + QS_THUMB_LAYOUTS[i].id + '.png';
+      a.download = 'thumbnail-' + (safe || 'quietshelf') + '.png';
       a.href = URL.createObjectURL(blob);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      // Restore the preview (with handle) after export.
+      const ctx2 = canvas.getContext('2d');
+      ctx2.clearRect(0, 0, QS_THUMB_W, QS_THUMB_H);
+      bboxRef.current = paintThumb(ctx2, photoImg, hook, accent, textPos.tx, textPos.ty, textScale, true);
     }, 'image/png');
   }
 
@@ -443,27 +534,28 @@ function ThumbnailStudio(props) {
       ) : null}
 
       {photoImg ? (
-        <div className="qs-thumbgrid">
-          {QS_THUMB_LAYOUTS.map(function (layout, i) {
-            return (
-              <div key={layout.id} className="qs-thumbcard">
-                <div className="qs-thumbcanvas-wrap">
-                  <canvas ref={canvasRefs[i]} className="qs-thumbcanvas" />
-                </div>
-                <div className="qs-thumbcard__foot">
-                  <span className="qs-thumbcard__name">{layout.name}</span>
-                  <button type="button" className="qs-payoff__again" onClick={function () { download(i); }} disabled={busy}>
-                    <Icon name="download" size={13} />PNG
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="qs-thumbcard qs-thumbcard--single">
+          <div className="qs-thumbcanvas-wrap">
+            <canvas
+              ref={canvasRef}
+              className="qs-thumbcanvas qs-thumbcanvas--drag"
+              onPointerDown={onCanvasPointerDown}
+              onPointerMove={onCanvasPointerMove}
+              onPointerUp={onCanvasPointerUp}
+              onPointerCancel={onCanvasPointerUp}
+            />
+          </div>
+          <div className="qs-thumbcard__foot">
+            <span className="qs-thumbcard__name">Drag the text to move it · drag the amber dot to resize</span>
+            <button type="button" className="qs-payoff__again" onClick={download} disabled={busy}>
+              <Icon name="download" size={13} />Download PNG
+            </button>
+          </div>
         </div>
       ) : (
         <div className="qs-thumbempty">
           <Icon name="image" size={40} />
-          <p className="qs-quiethint">Find a face or upload a photo to see three thumbnail layouts.</p>
+          <p className="qs-quiethint">Find a face or upload a photo to build your thumbnail.</p>
         </div>
       )}
     </div>

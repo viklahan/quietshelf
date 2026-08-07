@@ -57,6 +57,7 @@
     fd.append('title', emotion);      // e.g. "pensive man looking away portrait"
     fd.append('passage', '');
     fd.append('n', String(n));
+    fd.append('exact', 'true');       // search this phrase verbatim - no term extraction
     const resp = await fetch(BASE + '/api/format/cover-suggestions', { method: 'POST', body: fd });
     if (!resp.ok) throw await friendlyError(resp, 'Could not fetch thumbnail photos.');
     return await resp.json();

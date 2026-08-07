@@ -32,6 +32,11 @@ these directly off disk, so a failed run needs zero terminal copy-pasting.
 
 - **`Dev Quiet Shelf.bat`** — for development. Kills anything stale on :8090,
   verifies deps, starts `.venv` uvicorn with `--reload`, logs to `_live.log`.
+  **Caveat learned the hard way:** on Windows, `--reload` does NOT reliably
+  detect Python files written through the Claude Filesystem connector. After
+  any backend (.py) change, double-click the dev bat again — it kills and
+  restarts in one click. Static files (jsx/css/html) are served fresh without
+  a restart.
 - **`Start Quiet Shelf.bat`** — for normal use. Kills stale servers, checks
   deps, starts without reload, opens the browser.
 

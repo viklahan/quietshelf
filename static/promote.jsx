@@ -117,6 +117,7 @@ function Promote() {
   const [doneChunks, setDoneChunks] = React.useState(0);
   const [inputWordCount, setInputWordCount] = React.useState(0);
   const [showThumbnail, setShowThumbnail] = React.useState(false);
+  const [showNarrate, setShowNarrate] = React.useState(false);
   const [mapTitle, setMapTitle] = React.useState('');
   const [remapBusy, setRemapBusy] = React.useState(false);
   const [exportOpen, setExportOpen] = React.useState(false);
@@ -386,6 +387,26 @@ function Promote() {
       rows.map(function(r) { return r.map(csvEscape).join(','); }).join('\n'));
   }
 
+  function applyRealDurations(durs) {
+    // Narration gives us the TRUE seconds per segment; recompute the whole
+    // timeline cumulatively so start/end times match the spoken piece.
+    setSegs(function(prev) {
+      let t = 0;
+      const fmt = function(s) { const m = Math.floor(s / 60), ss = Math.round(s % 60); return m + ':' + String(ss).padStart(2, '0'); };
+      const out = prev.map(function(s) {
+        const d = durs.find(function(x) { return x.index === s.index; });
+        if (!d) return s;
+        const start = t, end = t + d.seconds; t = end;
+        return Object.assign({}, s, {
+          startTime: fmt(start), endTime: fmt(end),
+          clipDurationSeconds: Math.max(1, Math.round(d.seconds)),
+        });
+      });
+      saveLastResult({ segs: out, groundedBy: groundedBy, found: found });
+      return out;
+    });
+  }
+
   function clearAll() {
     setPhase('compose');
     setFound({});
@@ -429,6 +450,17 @@ function Promote() {
     );
   }
 
+  if (showNarrate) {
+    const Narrate = window.NarrateStudio;
+    return (
+      <Narrate
+        segments={segs}
+        onClose={function() { setShowNarrate(false); }}
+        onDurations={applyRealDurations}
+      />
+    );
+  }
+
   if (showThumbnail) {
     const Studio = window.ThumbnailStudio;
     return (
@@ -468,7 +500,12 @@ function Promote() {
           ) : null}
           {!isLoading && segs.length > 0 ? (
             <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={function() { setShowThumbnail(true); }}>
-              <QSIcoPromo name="image" size={13} />Make a thumbnail
+              <QSIcoPromo name="image" size={13} />Thumbnail Studio
+            </button>
+          ) : null}
+          {!isLoading && segs.length > 0 ? (
+            <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={function() { setShowNarrate(true); }}>
+              <QSIcoPromo name="mic" size={13} />Narrate
             </button>
           ) : null}
           <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={clearAll}>

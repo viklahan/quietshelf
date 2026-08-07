@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="app/tokens/fonts-newsreader.css">
+  <link rel="stylesheet" href="app/tokens/fonts-source-serif-4.css">
+  <link rel="stylesheet" href="app/tokens/fonts-ibm-plex-mono.css">
+  <link rel="stylesheet" href="app/tokens/colors.css">
+  <link rel="stylesheet" href="app/tokens/typography.css">
+  <link rel="stylesheet" href="app/tokens/spacing.css">
+  <link rel="stylesheet" href="app/tokens/base.css">
+  <link rel="stylesheet" href="app/kit.css">
+  <link rel="stylesheet" href="app/refresh.css">
+  <script src="app/_ds_bundle.js"></script>
+  <style>
+    a { color: var(--ember-400); } a:hover { color: var(--ember-500); }
+  </style>
+</helmet>
+<div class="qs-app">
+  <header class="qs-header">
+    <button type="button" class="qs-brand" aria-label="Quiet Shelf, home"><img src="app/assets/logo-mark.svg" alt="" width="26" height="26" style="display: block"><span class="qs-brand__text"><span class="qs-brand__name">Quiet Shelf</span><span class="qs-brand__sub">Your story, made real.</span></span></button>
+    <nav class="qs-nav" aria-label="Sections">
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg><span>Format</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"></path><path d="M16 8 2 22"></path><path d="M17.5 15H9"></path></svg><span>Blurb</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M7 3v18"></path><path d="M3 7.5h4"></path><path d="M3 12h18"></path><path d="M3 16.5h4"></path><path d="M17 3v18"></path><path d="M17 7.5h4"></path><path d="M17 16.5h4"></path></svg><span>Promote</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg><span>Story Map</span></button>
+      <button type="button" class="qs-nav__tab qs-nav__tab--active" aria-current="page"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg><span>Scout</span></button>
+      <button type="button" class="qs-nav__tab" style="opacity: 0.7"><span>About</span></button>
+    </nav>
+  </header>
+  <main class="qs-main">
+
+    <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}">
+      <div class="qs-page qs-page--narrow" data-screen-label="Scout · the desk">
+        <p class="qs-lead">What are people actually asking right now? Scout pulls the rising and top conversations from your corners of the internet and distills them into research material.</p>
+
+        <sc-if value="{{ redditApproved }}" hint-placeholder-val="{{ true }}">
+          <div class="qs-step">
+            <p class="qs-steplabel">Where I&rsquo;ll listen</p>
+            <div class="qs-pills">
+              <sc-for list="{{ sources }}" as="s" hint-placeholder-count="3">
+                <span class="qs-pill qs-pill--on" style="display: inline-flex; align-items: center; gap: 6px">{{ s.display }}<button type="button" aria-label="Remove {{ s.label }}" onClick="{{ s.onRemove }}" style="background: none; border: 0; color: inherit; cursor: pointer; padding: 0; display: inline-flex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></span>
+              </sc-for>
+              <input class="qs-compinput" style="max-width: 200px" placeholder="add a subreddit" value="{{ sourceDraft }}" onChange="{{ onSourceDraft }}" onKeyDown="{{ onSourceKey }}" aria-label="Add a subreddit">
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="ghost" size="sm" onClick="{{ addSource }}" hint-size="52px,33px">Add</x-import>
+            </div>
+            <p class="qs-quiethint" style="margin: var(--space-3) 0 0">Rising and weekly-top conversations, up to six corners.</p>
+          </div>
+        </sc-if>
+
+        <div class="qs-step">
+          <p class="qs-steplabel">Seed phrases</p>
+          <div class="qs-pills">
+            <sc-for list="{{ seeds }}" as="s" hint-placeholder-count="3">
+              <span class="qs-pill qs-pill--on" style="display: inline-flex; align-items: center; gap: 6px">{{ s.label }}<button type="button" aria-label="Remove {{ s.label }}" onClick="{{ s.onRemove }}" style="background: none; border: 0; color: inherit; cursor: pointer; padding: 0; display: inline-flex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></span>
+            </sc-for>
+            <input class="qs-compinput" style="max-width: 200px" placeholder="{{ seedPlaceholder }}" value="{{ seedDraft }}" onChange="{{ onSeedDraft }}" onKeyDown="{{ onSeedKey }}" aria-label="Add a seed phrase">
+            <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="ghost" size="sm" onClick="{{ addSeed }}" hint-size="52px,33px">Add</x-import>
+          </div>
+          <p class="qs-quiethint" style="margin: var(--space-3) 0 0">Seed phrases pull live autocomplete from Google, YouTube, Bing, Yahoo, and Yandex — what people are typing, not just posting.</p>
+        </div>
+
+        <div class="qs-actionrow">
+          <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" size="lg" icon="search" onClick="{{ harvest }}" hint-size="220px,48px">Harvest this week</x-import>
+          <span class="qs-quiethint">Sources and seeds stay in your browser.</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isWorking }}" hint-placeholder-val="{{ false }}">
+      <div class="qs-page qs-page--narrow" data-screen-label="Scout · harvesting">
+        <div class="qs-becoming" role="status" aria-live="polite">
+          <span class="qs-becoming__lamp" aria-hidden="true"></span>
+          <p class="qs-becoming__line">{{ becomingLine }}</p>
+          <p class="qs-becoming__sub">Google · YouTube · Bing · Yahoo · Yandex</p>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMaterial }}" hint-placeholder-val="{{ false }}">
+      <div class="qs-page qs-page--narrow" data-screen-label="Scout · material">
+        <p class="qs-lead">The week came back full. Tell me what to look for.</p>
+        <div class="qs-meter" style="margin: 0 0 var(--space-6)">
+          <span><strong>12</strong> conversations</span>
+          <span aria-hidden="true">·</span>
+          <span><strong>231</strong> suggestions</span>
+          <span aria-hidden="true">·</span>
+          <span><strong>1,418</strong> words</span>
+        </div>
+
+        <div class="qs-step">
+          <section class="qs-rcard">
+            <div class="qs-rcard__head">
+              <span class="qs-rcard__label">This week&rsquo;s material</span>
+              <div style="display: flex; align-items: center; gap: var(--space-4)">
+                <button type="button" class="qs-copy{{ copyMaterialCls }}" onClick="{{ copyMaterial }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>{{ copyMaterialLabel }}</button>
+                <button type="button" class="qs-copy" onClick="{{ downloadMaterial }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download .md</button>
+              </div>
+            </div>
+            <pre class="qs-scout__material" style="border: none; padding: 0; max-height: 240px">{{ material }}</pre>
+          </section>
+        </div>
+
+        <div class="qs-step">
+          <p class="qs-steplabel">Your editorial prompt</p>
+          <textarea class="qs-input qs-scout__prompt" rows="7" placeholder="Paste your editorial research prompt here. It stays in your browser." value="{{ prompt }}" onChange="{{ onPrompt }}" aria-label="Editorial prompt"></textarea>
+          <p class="qs-quiethint" style="margin: var(--space-2) 0 0">Yours to shape — it lives in this browser, never on the shelf.</p>
+        </div>
+
+        <div class="qs-actionrow">
+          <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" size="lg" icon="sparkles" onClick="{{ synthesize }}" hint-size="280px,48px">Find this week&rsquo;s questions</x-import>
+          <button type="button" class="qs-payoff__again" onClick="{{ reset }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>New harvest</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isThinking }}" hint-placeholder-val="{{ false }}">
+      <div class="qs-page qs-page--narrow" data-screen-label="Scout · synthesizing">
+        <div class="qs-becoming" role="status" aria-live="polite">
+          <span class="qs-becoming__lamp" aria-hidden="true"></span>
+          <p class="qs-becoming__line">{{ becomingLine }}</p>
+          <p class="qs-becoming__sub">Your prompt · your rules</p>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isFindings }}" hint-placeholder-val="{{ false }}">
+      <div class="qs-page qs-page--narrow" data-screen-label="Scout · findings">
+        <p class="qs-lead">This week&rsquo;s questions, found.</p>
+        <div class="qs-actionrow" style="justify-content: flex-start; margin: 0 0 var(--space-8)">
+          <button type="button" class="qs-copy{{ copyFindingsCls }}" onClick="{{ copyFindings }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>{{ copyFindingsLabel }}</button>
+          <button type="button" class="qs-copy" onClick="{{ downloadFindings }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download .md</button>
+          <span class="qs-quiethint">From 12 conversations and 231 suggestions · Aug 7</span>
+        </div>
+
+        <div class="qs-results">
+          <sc-for list="{{ findings }}" as="f" hint-placeholder-count="3">
+            <section class="qs-rcard">
+              <div class="qs-rcard__head">
+                <span class="qs-rcard__label">Finding {{ f.n }} · {{ f.title }}</span>
+                <button type="button" class="qs-copy{{ f.copyCls }}" onClick="{{ f.onCopy }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>{{ f.copyLabel }}</button>
+              </div>
+              <p style="font-family: var(--font-display); font-style: italic; font-size: 1.18rem; line-height: 1.45; color: var(--text-body); margin: 0 0 var(--space-4); max-width: 52ch; text-wrap: pretty">&ldquo;{{ f.thought }}&rdquo;</p>
+              <dl class="qs-char__texture" style="margin: 0 0 var(--space-4)">
+                <div class="qs-char__trow"><dt>Missing</dt><dd>{{ f.missing }}</dd></div>
+                <div class="qs-char__trow"><dt>Branches</dt><dd>{{ f.branches }}</dd></div>
+                <div class="qs-char__trow"><dt>Evidence</dt><dd>{{ f.evidence }}</dd></div>
+              </dl>
+              <div style="display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; font-family: var(--font-mono); font-size: var(--fs-meta); letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-faint)">
+                <span style="display: inline-flex; align-items: center; gap: 8px">Evergreen <span class="qs-imp"><sc-for list="{{ f.everDots }}" as="d" hint-placeholder-count="5"><span class="{{ d.cls }}"></span></sc-for></span></span>
+                <span style="display: inline-flex; align-items: center; gap: 8px">Loud now <span class="qs-imp"><sc-for list="{{ f.loudDots }}" as="d" hint-placeholder-count="5"><span class="{{ d.cls }}"></span></sc-for></span></span>
+              </div>
+            </section>
+          </sc-for>
+
+          <section class="qs-imagine">
+            <div class="qs-imagine__head">
+              <span class="qs-imagine__ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"></path><path d="M16 8 2 22"></path><path d="M17.5 15H9"></path></svg></span>
+              <span class="qs-imagine__title">The one to make this week</span>
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Stamp" tone="ember" hint-size="90px,22px">Finding 03</x-import>
+            </div>
+            <dl class="qs-char__texture" style="margin: 0 0 var(--space-4); border-top: none; padding-top: 0">
+              <div class="qs-char__trow"><dt>Titles</dt><dd>the ledger you carry · a clean slate, graded · nobody set the deadline</dd></div>
+              <div class="qs-char__trow"><dt>Hooks</dt><dd style="font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em">The score follows you · Clean slate, old ledger · Who set thirty</dd></div>
+            </dl>
+            <p class="qs-imagine__line" style="margin: 0">Opening beat: <em>You didn&rsquo;t fail the plan — you outgrew the person who made it, and never renegotiated.</em></p>
+          </section>
+        </div>
+
+        <details style="margin-top: var(--space-8)">
+          <summary class="qs-quiethint" style="cursor: pointer">Raw material (1,418 words)</summary>
+          <pre class="qs-scout__material" style="margin-top: var(--space-3)">{{ material }}</pre>
+        </details>
+
+        <div class="qs-actionrow">
+          <button type="button" class="qs-payoff__again" onClick="{{ reset }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>New harvest</button>
+          <button type="button" class="qs-payoff__again" onClick="{{ backToMaterial }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"></path><path d="M16 8 2 22"></path><path d="M17.5 15H9"></path></svg>Refine the prompt</button>
+        </div>
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;desk&quot;, &quot;options&quot;: [&quot;desk&quot;, &quot;working&quot;, &quot;material&quot;, &quot;thinking&quot;, &quot;findings&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Preview&quot;}, &quot;redditApproved&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Content&quot;}}">
+class Component extends DCLogic {
+  STARTER = [
+    'You are an editorial researcher for a quiet, introspective video essay channel.',
+    'Your job: find the CONTRADICTIONS people are living inside right now that this channel can investigate.',
+    '',
+    'A finding must have all five: (1) a lived contradiction, phrased X-yet-Y, not a topic;',
+    '(2) a felt first-person sentence a viewer would recognize as their own 1am thought;',
+    '(3) missing language - common experience, under-named; (4) 3-4 branching sub-questions',
+    'that could sustain an essay; (5) convergence across at least two independent source types.',
+    '',
+    'Evidence rules: quote or closely paraphrase the MATERIAL, never invent statistics,',
+    'and say "nothing this week" if the material clears no bars.',
+    '',
+    'Score each finding: evergreen depth /5 and current loudness /5 (quote the evidence of a spike).',
+    '',
+    'Output 4-6 findings, then THE ONE TO MAKE THIS WEEK with: 3 lowercase-calm titles,',
+    '3 thumbnail hooks (2-6 words, ALL CAPS, declarative), and one opening-beat sentence.',
+    'Voice: second person, calm. No self-help vocabulary.',
+  ].join('\n');
+
+  MATERIAL = [
+    'SEARCH SUGGESTIONS (what people are typing right now):',
+    '',
+    '[google autocomplete]',
+    'why do i feel stuck in life',
+    'feeling stuck at work but scared to leave',
+    'why do i feel behind in life',
+    'doing everything right and still failing',
+    'starting over at 30 with nothing',
+    'how to stop feeling like time is running out',
+    '',
+    '[youtube autocomplete]',
+    'doing everything right and still stuck',
+    'starting over at 30 storytime',
+    'how to stop comparing my timeline',
+    'why self improvement made me miserable',
+    '',
+    '[bing autocomplete]',
+    'is it normal to feel stuck at 27',
+    'starting over after losing everything',
+    '',
+    '[yahoo autocomplete]',
+    'is it normal to be tired of trying',
+    'how to start over in life with no money',
+    '',
+    '[yandex autocomplete]',
+    'why do i sabotage my own plans',
+    'feeling stuck between who i was and who i want to be',
+    '',
+    '---',
+    '',
+    'CONVERSATIONS (rising + weekly top):',
+    '',
+    '[r/selfimprovement · rising]',
+    '"I did everything the productivity people said and I feel nothing" (214 comments)',
+    '"Anyone else exhausted by their own routines?" (98 comments)',
+    '',
+    '[r/DecidingToBeBetter · weekly top]',
+    '"Turned 30 last week. Restarting my whole life and terrified." (412 comments)',
+    '',
+    '[r/getdisciplined · weekly top]',
+    '"My tracker streak is 190 days and I still feel behind" (167 comments)',
+  ].join('\n');
+
+  FINDINGS = [
+    { n: '01', title: 'Optimizing, yet drifting',
+      thought: "My tracker says I'm consistent. So why does every day feel like a rehearsal for a life that never starts?",
+      missing: "Progress that never accumulates into direction.",
+      branches: "Measurement as avoidance · who audits the auditor · when the system becomes the procrastination",
+      evidence: '"why do i feel behind in life" (google + bing) · "my tracker streak is 190 days and I still feel behind" (r/getdisciplined)',
+      ever: 5, loud: 4 },
+    { n: '02', title: 'Rested, yet exhausted',
+      thought: "I slept nine hours and woke up tired of being me.",
+      missing: "Fatigue that sleep doesn't touch — decision-weariness, self-surveillance.",
+      branches: "Rest vs. relief · the tiredness of self-improvement · is boredom rest",
+      evidence: '"is it normal to be tired of trying" (yahoo) · "exhausted by their own routines" (r/selfimprovement)',
+      ever: 4, loud: 3 },
+    { n: '03', title: 'Starting over, yet keeping score',
+      thought: "I want a clean slate, but I keep grading myself against the old one.",
+      missing: "The ledger we carry into every restart.",
+      branches: "What a restart actually resets · sunk-cost identity · 30 as a deadline nobody set",
+      evidence: '"starting over at 30 with nothing" (google + yandex) · "Restarting my whole life and terrified" (r/DecidingToBeBetter)',
+      ever: 4, loud: 5 },
+  ];
+
+  HARVEST_LINES = ['Listening to the search bars\u2026', 'Walking the rising threads\u2026', 'Gathering the week\u2019s asking\u2026'];
+  THINK_LINES = ['Reading the week\u2026', 'Weighing the questions\u2026', 'Holding them to your bar\u2026'];
+
+  state = {
+    phase: (this.props && this.props.screen) || 'desk',
+    sources: ['selfimprovement', 'DecidingToBeBetter', 'getdisciplined'],
+    seeds: ['feeling stuck', 'starting over at 30', 'doing everything right'],
+    sourceDraft: '', seedDraft: '',
+    prompt: '', becomeIdx: 0, copiedKey: '',
+  };
+
+  componentDidMount() { this.setState({ prompt: this.STARTER }); }
+  componentDidUpdate(prevProps) {
+    if (this.props.screen !== prevProps.screen && this.props.screen) this._go(this.props.screen);
+  }
+  componentWillUnmount() { this._clear(); }
+
+  _clear() {
+    if (this._iv) clearInterval(this._iv);
+    if (this._to) clearTimeout(this._to);
+    this._iv = this._to = null;
+  }
+  _go(phase) {
+    this._clear();
+    if (phase === 'working') this._run('working', 'material');
+    else if (phase === 'thinking') this._run('thinking', 'findings');
+    else this.setState({ phase: phase });
+  }
+  _run(phase, next) {
+    this._clear();
+    this.setState({ phase: phase, becomeIdx: 0 });
+    this._iv = setInterval(() => this.setState(s => ({ becomeIdx: s.becomeIdx + 1 })), 1200);
+    this._to = setTimeout(() => { this._clear(); this.setState({ phase: next }); }, 3400);
+  }
+
+  _copy(key, text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    this.setState({ copiedKey: key });
+    clearTimeout(this._ct);
+    this._ct = setTimeout(() => this.setState({ copiedKey: '' }), 1600);
+  }
+  _download(name, text) {
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  _findingText(f) {
+    return 'Finding ' + f.n + ' · ' + f.title + '\n"' + f.thought + '"\nMissing language: ' + f.missing +
+      '\nBranches: ' + f.branches + '\nEvidence: ' + f.evidence +
+      '\nEvergreen ' + f.ever + '/5 · Loud now ' + f.loud + '/5';
+  }
+  _dots(n) {
+    const out = [];
+    for (let i = 0; i < 5; i++) out.push({ cls: i < n ? 'qs-imp__dot qs-imp__dot--on' : 'qs-imp__dot' });
+    return out;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const allFindings = this.FINDINGS.map(f => this._findingText(f)).join('\n\n') +
+      '\n\nTHE ONE TO MAKE THIS WEEK — 03\nTitles: the ledger you carry · a clean slate, graded · nobody set the deadline' +
+      '\nHooks: THE SCORE FOLLOWS YOU · CLEAN SLATE, OLD LEDGER · WHO SET THIRTY' +
+      '\nOpening beat: You didn\u2019t fail the plan — you outgrew the person who made it, and never renegotiated.';
+    return {
+      isDesk: s.phase === 'desk',
+      isWorking: s.phase === 'working',
+      isMaterial: s.phase === 'material',
+      isThinking: s.phase === 'thinking',
+      isFindings: s.phase === 'findings',
+      redditApproved: this.props.redditApproved !== false,
+      becomingLine: (s.phase === 'thinking' ? this.THINK_LINES : this.HARVEST_LINES)[s.becomeIdx % 3],
+      material: this.MATERIAL,
+      prompt: s.prompt,
+      onPrompt: (e) => this.setState({ prompt: e.target.value }),
+      sources: s.sources.map((label, i) => ({
+        label: label, display: 'r/' + label,
+        onRemove: () => this.setState(p => ({ sources: p.sources.filter((_, j) => j !== i) })),
+      })),
+      seeds: s.seeds.map((label, i) => ({
+        label: label,
+        onRemove: () => this.setState(p => ({ seeds: p.seeds.filter((_, j) => j !== i) })),
+      })),
+      sourceDraft: s.sourceDraft,
+      seedDraft: s.seedDraft,
+      seedPlaceholder: s.seeds.length ? 'add another' : 'e.g. feeling stuck',
+      onSourceDraft: (e) => this.setState({ sourceDraft: e.target.value }),
+      onSeedDraft: (e) => this.setState({ seedDraft: e.target.value }),
+      onSourceKey: (e) => { if (e.key === 'Enter') this._addSource(); },
+      onSeedKey: (e) => { if (e.key === 'Enter') this._addSeed(); },
+      addSource: () => this._addSource(),
+      addSeed: () => this._addSeed(),
+      harvest: () => this._run('working', 'material'),
+      synthesize: () => this._run('thinking', 'findings'),
+      reset: () => this.setState({ phase: 'desk' }),
+      backToMaterial: () => this.setState({ phase: 'material' }),
+      copyMaterial: () => this._copy('material', this.MATERIAL),
+      copyMaterialLabel: s.copiedKey === 'material' ? 'Copied' : 'Copy material',
+      copyMaterialCls: s.copiedKey === 'material' ? ' qs-copy--done' : '',
+      downloadMaterial: () => this._download('scout-material.md', this.MATERIAL),
+      copyFindings: () => this._copy('findings', allFindings),
+      copyFindingsLabel: s.copiedKey === 'findings' ? 'Copied' : 'Copy findings',
+      copyFindingsCls: s.copiedKey === 'findings' ? ' qs-copy--done' : '',
+      downloadFindings: () => this._download('scout-findings.md', allFindings),
+      findings: this.FINDINGS.map(f => ({
+        n: f.n, title: f.title, thought: f.thought, missing: f.missing,
+        branches: f.branches, evidence: f.evidence,
+        everDots: this._dots(f.ever), loudDots: this._dots(f.loud),
+        copyLabel: s.copiedKey === 'f' + f.n ? 'Copied' : 'Copy',
+        copyCls: s.copiedKey === 'f' + f.n ? ' qs-copy--done' : '',
+        onCopy: () => this._copy('f' + f.n, this._findingText(f)),
+      })),
+    };
+  }
+
+  _addSource() {
+    const v = this.state.sourceDraft.trim().replace(/^.*r\//, '').replace(/\/+$/, '');
+    if (!v || this.state.sources.length >= 6) return;
+    this.setState(p => ({ sources: p.sources.concat([v]), sourceDraft: '' }));
+  }
+  _addSeed() {
+    const v = this.state.seedDraft.trim();
+    if (!v || this.state.seeds.length >= 4) return;
+    this.setState(p => ({ seeds: p.seeds.concat([v]), seedDraft: '' }));
+  }
+}
+</script>
+</body>
+</html>

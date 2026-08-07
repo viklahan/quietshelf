@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="app/tokens/fonts-newsreader.css">
+  <link rel="stylesheet" href="app/tokens/fonts-source-serif-4.css">
+  <link rel="stylesheet" href="app/tokens/fonts-ibm-plex-mono.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&display=swap">
+  <link rel="stylesheet" href="app/tokens/colors.css">
+  <link rel="stylesheet" href="app/tokens/typography.css">
+  <link rel="stylesheet" href="app/tokens/spacing.css">
+  <link rel="stylesheet" href="app/tokens/base.css">
+  <link rel="stylesheet" href="app/kit.css">
+  <link rel="stylesheet" href="app/refresh.css">
+  <style>
+    a { color: var(--ember-400); } a:hover { color: var(--ember-500); }
+  </style>
+</helmet>
+<div class="qs-app" data-screen-label="Scout — current (recreated from static/scout.jsx)">
+  <header class="qs-header">
+    <button type="button" class="qs-brand" aria-label="Quiet Shelf, home"><img src="app/assets/logo-mark.svg" alt="" width="26" height="26" style="display: block"><span class="qs-brand__text"><span class="qs-brand__name">Quiet Shelf</span><span class="qs-brand__sub">Your story, made real.</span></span></button>
+    <nav class="qs-nav" aria-label="Sections">
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg><span>Format</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"></path><path d="M16 8 2 22"></path><path d="M17.5 15H9"></path></svg><span>Blurb</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M7 3v18"></path><path d="M3 7.5h4"></path><path d="M3 12h18"></path><path d="M3 16.5h4"></path><path d="M17 3v18"></path><path d="M17 7.5h4"></path><path d="M17 16.5h4"></path></svg><span>Promote</span></button>
+      <button type="button" class="qs-nav__tab"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg><span>Story Map</span></button>
+      <button type="button" class="qs-nav__tab qs-nav__tab--active" aria-current="page"><svg class="qs-nav__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg><span>Scout</span></button>
+      <button type="button" class="qs-nav__tab" style="opacity: 0.7"><span>About</span></button>
+    </nav>
+  </header>
+  <main class="qs-main">
+    <div class="qs-page">
+      <p class="qs-lead">What are people actually asking right now? Scout pulls the rising and top conversations from your corners of the internet and distills them into research material.</p>
+      <div class="qs-thumbrow">
+        <label class="qs-thumblabel">Seeds</label>
+        <div class="qs-groundrow" style="flex-wrap: wrap">
+          <span class="qs-pill qs-pill--on" style="display: inline-flex; align-items: center; gap: 6px">feeling stuck<button type="button" aria-label="Remove feeling stuck" style="background: none; border: 0; color: inherit; cursor: pointer; padding: 0; display: inline-flex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></span>
+          <span class="qs-pill qs-pill--on" style="display: inline-flex; align-items: center; gap: 6px">starting over at 30<button type="button" aria-label="Remove starting over at 30" style="background: none; border: 0; color: inherit; cursor: pointer; padding: 0; display: inline-flex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></span>
+          <span class="qs-pill qs-pill--on" style="display: inline-flex; align-items: center; gap: 6px">doing everything right<button type="button" aria-label="Remove doing everything right" style="background: none; border: 0; color: inherit; cursor: pointer; padding: 0; display: inline-flex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></span>
+          <input class="qs-input" style="max-width: 220px" placeholder="add another">
+          <button type="button" class="qs-payoff__again">Add</button>
+        </div>
+      </div>
+      <p class="qs-quiethint" style="margin: 0 0 var(--space-4)">Seed phrases pull live autocomplete from Google, YouTube, Bing, Yahoo, and Yandex — what people are typing, not just posting.</p>
+      <div class="qs-actionrow" style="justify-content: flex-start; gap: var(--space-3)">
+        <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Harvest this week</button>
+      </div>
+      <div style="margin-top: var(--space-6)">
+        <p class="qs-quiethint">231 search suggestions · 1418 words</p>
+        <div class="qs-actionrow" style="justify-content: flex-start; gap: var(--space-3); margin: var(--space-3) 0">
+          <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>Copy material</button>
+          <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download .md</button>
+        </div>
+        <div class="qs-thumbrow" style="align-items: flex-start; margin-top: var(--space-5)">
+          <label class="qs-thumblabel" style="padding-top: 10px">Prompt</label>
+          <div style="flex: 1; min-width: 0">
+            <textarea class="qs-input qs-scout__prompt" rows="7" placeholder="Paste your editorial research prompt here. It stays in your browser.">You are an editorial researcher for a quiet, introspective video essay channel.
+Your job: find the CONTRADICTIONS people are living inside right now that this channel can investigate.
+
+A finding must have all five: (1) a lived contradiction, phrased X-yet-Y, not a topic;
+(2) a felt first-person sentence a viewer would recognize as their own 1am thought;
+(3) missing language - common experience, under-named; (4) 3-4 branching sub-questions
+that could sustain an essay; (5) convergence across at least two independent source types.
+
+Evidence rules: quote or closely paraphrase the MATERIAL, never invent statistics,
+and say "nothing this week" if the material clears no bars.
+
+Score each finding: evergreen depth /5 and current loudness /5 (quote the evidence of a spike).
+
+Output 4-6 findings, then THE ONE TO MAKE THIS WEEK with: 3 lowercase-calm titles,
+3 thumbnail hooks (2-6 words, ALL CAPS, declarative), and one opening-beat sentence.
+Voice: second person, calm. No self-help vocabulary.</textarea>
+          </div>
+        </div>
+        <div class="qs-actionrow" style="justify-content: flex-start; gap: var(--space-3)">
+          <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"></path><path d="M16 8 2 22"></path><path d="M17.5 15H9"></path></svg>Find this week&rsquo;s questions</button>
+        </div>
+        <div style="margin-top: var(--space-5)">
+          <div class="qs-actionrow" style="justify-content: flex-start; gap: var(--space-3); margin: var(--space-2) 0">
+            <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>Copy findings</button>
+            <button type="button" class="qs-payoff__again"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download .md</button>
+          </div>
+          <pre class="qs-scout__material qs-scout__findings">FINDINGS — WEEK OF AUG 3
+
+01 · OPTIMIZING, YET DRIFTING
+The 1am thought: "My tracker says I'm consistent. So why does every day feel like a rehearsal for a life that never starts?"
+Missing language: progress that never accumulates into direction.
+Branches: measurement as avoidance · who audits the auditor · when the system becomes the procrastination · what "on track" is tracking toward
+Evidence: "why do i feel behind in life" (google + bing), "doing everything right and still stuck" (youtube)
+Evergreen 5/5 · Loud now 4/5 — "feel behind" variants surfaced in 4 of 5 engines this week
+
+02 · RESTED, YET EXHAUSTED
+The 1am thought: "I slept nine hours and woke up tired of being me."
+Missing language: fatigue that sleep doesn't touch — decision-weariness, self-surveillance.
+Branches: rest vs. relief · the tiredness of self-improvement · is boredom rest
+Evidence: "why am i tired of everything" (google), "is it normal to be tired of trying" (yahoo)
+Evergreen 4/5 · Loud now 3/5
+
+03 · STARTING OVER, YET KEEPING SCORE
+The 1am thought: "I want a clean slate, but I keep grading myself against the old one."
+Missing language: the ledger we carry into every restart.
+Branches: what a restart actually resets · sunk-cost identity · 30 as a deadline nobody set
+Evidence: "starting over at 30 with nothing" (google + yandex), "how to stop comparing my timeline" (youtube)
+Evergreen 4/5 · Loud now 5/5 — "starting over at 30" spiked across engines
+
+THE ONE TO MAKE THIS WEEK — 03
+Titles: the ledger you carry · a clean slate, graded · nobody set the deadline
+Hooks: THE SCORE FOLLOWS YOU · CLEAN SLATE, OLD LEDGER · WHO SET THIRTY
+Opening beat: You didn't fail the plan — you outgrew the person who made it, and never renegotiated.</pre>
+        </div>
+        <details style="margin-top: var(--space-5)">
+          <summary class="qs-quiethint" style="cursor: pointer">Raw material (1418 words)</summary>
+          <pre class="qs-scout__material">SEARCH SUGGESTIONS (what people are typing right now):
+
+[google autocomplete]
+why do i feel stuck in life
+feeling stuck in my 20s
+feeling stuck at work but scared to leave
+why do i feel behind in life
+doing everything right and still failing
+starting over at 30 with nothing
+why can't i just be happy with what i have
+how to stop feeling like time is running out
+
+[youtube autocomplete]
+doing everything right and still stuck
+feeling stuck in life motivation
+starting over at 30 storytime
+how to stop comparing my timeline
+why self improvement made me miserable
+
+[bing autocomplete]
+why do i feel behind in life
+is it normal to feel stuck at 27
+feeling stuck quotes
+starting over after losing everything
+
+[yahoo autocomplete]
+is it normal to be tired of trying
+feeling stuck in a rut meaning
+how to start over in life with no money
+
+[yandex autocomplete]
+starting over at 30
+why do i sabotage my own plans
+feeling stuck between who i was and who i want to be</pre>
+        </details>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+</body>
+</html>

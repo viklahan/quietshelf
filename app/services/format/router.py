@@ -41,6 +41,7 @@ async def cover_suggestions(
     title: str = Form(...),
     passage: str = Form(""),
     n: int = Form(3),
+    exact: bool = Form(False),
     _: None = Depends(guard),
 ):
     """Extract visual themes from the story and return n photo candidates
@@ -48,8 +49,8 @@ async def cover_suggestions(
     picks one; the chosen photo URL is then passed back in the format call.
     Returns an empty list when no image APIs are configured — never 500.
     """
-    n = max(1, min(5, n))
-    suggestions = get_cover_suggestions(title=title, passage=passage, n=n)
+    n = max(1, min(12, n))
+    suggestions = get_cover_suggestions(title=title, passage=passage, n=n, exact=exact)
     return {"suggestions": suggestions}
 
 

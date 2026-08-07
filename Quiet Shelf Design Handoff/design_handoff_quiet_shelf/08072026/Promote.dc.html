@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Promote — Script to Shot List" description="Paste a script, get a mapped video plan: segments, timings, moods, and one-click stock-footage searches. Wired to POST /api/map." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>
+  @keyframes qsp-fadein { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes qsp-deal { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .qsp-card { animation: qsp-deal var(--dur-slow) var(--ease-settle) both; }
+  .qsp-card:nth-child(1) { animation-delay: 0ms; }
+  .qsp-card:nth-child(2) { animation-delay: 60ms; }
+  .qsp-card:nth-child(3) { animation-delay: 120ms; }
+  .qsp-card:nth-child(4) { animation-delay: 180ms; }
+  .qsp-card:nth-child(5) { animation-delay: 240ms; }
+  .qsp-card:nth-child(6) { animation-delay: 300ms; }
+  .qsp-card:nth-child(7) { animation-delay: 360ms; }
+  .qsp-card:nth-child(8) { animation-delay: 420ms; }
+  .qsp-card:nth-child(9) { animation-delay: 480ms; }
+  .qsp-card:nth-child(10) { animation-delay: 540ms; }
+  .qsp-card:nth-child(11) { animation-delay: 600ms; }
+  .qsp-card:nth-child(12) { animation-delay: 660ms; }
+  .qsp-card:nth-child(n+13) { animation-delay: 720ms; }
+  @media (max-width: 640px) {
+    .qsp-summary-inner { gap: 12px !important; }
+    .qsp-summary-progress { min-width: 100% !important; order: 3; }
+    .qsp-summary-title { max-width: 100% !important; }
+  }
+</style>
+</helmet>
+
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:var(--content-max);margin:0 auto;padding:var(--space-12) var(--space-5) var(--space-16)" data-screen-label="Empty Desk">
+    <header style="text-align:center;margin-bottom:var(--space-10)">
+      <h1 style="font-family:var(--font-display);font-size:var(--fs-display);font-weight:var(--fw-display);line-height:var(--lh-display);letter-spacing:0.04em;text-transform:uppercase;color:var(--text-body);margin:0 0 var(--space-3)">Quiet Shelf</h1>
+      <p style="font-family:var(--font-display);font-style:italic;font-size:var(--fs-title);color:var(--text-muted);margin:0">Turn your writing into a video plan.</p>
+    </header>
+    <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.ScriptTextarea" value="{{ script }}" on-change="{{ onScript }}" min-height="300" hint-size="100%,320px"></x-import>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-3)">
+      <span style="display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:var(--fs-meta);letter-spacing:0.05em;color:var(--text-faint)">
+        <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Icon" name="file-text" size="13" hint-size="13px,13px"></x-import>
+        {{ wordMeta }}
+      </span>
+      <button type="button" onClick="{{ onSample }}" style="background:none;border:none;padding:4px 2px;cursor:pointer;font-family:var(--font-mono);font-size:var(--fs-meta);letter-spacing:0.05em;color:var(--text-faint);text-decoration:underline;text-underline-offset:3px">Try a sample script</button>
+    </div>
+    <sc-if value="{{ fieldError }}" hint-placeholder-val="">
+      <p role="alert" style="display:flex;align-items:center;gap:8px;font-family:var(--font-body);font-style:italic;font-size:var(--fs-body);color:var(--danger-text);margin:var(--space-4) 0 0">
+        <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Icon" name="circle-alert" size="14" hint-size="14px,14px"></x-import>
+        {{ fieldError }}
+      </p>
+    </sc-if>
+    <div style="display:flex;justify-content:center;margin-top:var(--space-8)">
+      <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" size="lg" icon="sparkles" on-click="{{ onMap }}" hint-size="220px,52px">Map My Visuals</x-import>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isWorking }}" hint-placeholder-val="">
+  <div style="max-width:var(--content-max);margin:0 auto;padding:var(--space-12) var(--space-5) var(--space-16);min-height:80vh;display:flex;flex-direction:column" data-screen-label="Working">
+    <header style="text-align:center;margin-bottom:var(--space-10)">
+      <h1 style="font-family:var(--font-display);font-size:var(--fs-display);font-weight:var(--fw-display);line-height:var(--lh-display);letter-spacing:0.04em;text-transform:uppercase;color:var(--text-body);margin:0 0 var(--space-3)">Quiet Shelf</h1>
+      <p style="font-family:var(--font-display);font-style:italic;font-size:var(--fs-title);color:var(--text-muted);margin:0">Turn your writing into a video plan.</p>
+    </header>
+    <div role="status" style="margin:var(--space-16) auto 0;max-width:380px;width:100%;text-align:center;display:flex;flex-direction:column;gap:var(--space-6)">
+      <p style="font-family:var(--font-display);font-style:italic;font-size:var(--fs-title);color:var(--text-muted);margin:0;animation:qsp-fadein var(--dur-slow) var(--ease-quiet) both">{{ workingLine }}</p>
+      <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.ProgressBar" value="{{ workingProgress }}" hint-size="100%,20px"></x-import>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isError }}" hint-placeholder-val="">
+  <div style="max-width:var(--content-max);margin:0 auto;padding:var(--space-12) var(--space-5) var(--space-16);min-height:80vh;display:flex;flex-direction:column" data-screen-label="Engine Error">
+    <header style="text-align:center;margin-bottom:var(--space-10)">
+      <h1 style="font-family:var(--font-display);font-size:var(--fs-display);font-weight:var(--fw-display);line-height:var(--lh-display);letter-spacing:0.04em;text-transform:uppercase;color:var(--text-body);margin:0 0 var(--space-3)">Quiet Shelf</h1>
+      <p style="font-family:var(--font-display);font-style:italic;font-size:var(--fs-title);color:var(--text-muted);margin:0">Turn your writing into a video plan.</p>
+    </header>
+    <div role="alert" style="margin:var(--space-16) auto 0;max-width:420px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-4)">
+      <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Icon" name="circle-alert" size="20" color="var(--danger-text)" hint-size="20px,20px"></x-import>
+      <p style="font-family:var(--font-body);font-style:italic;font-size:var(--fs-script);line-height:var(--lh-body);color:var(--text-body);margin:0">{{ errorMessage }}</p>
+      <div style="display:flex;gap:var(--space-3);justify-content:center">
+        <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" icon="rotate-ccw" on-click="{{ onRetry }}" hint-size="120px,44px">Retry</x-import>
+        <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="ghost" on-click="{{ onBack }}" hint-size="170px,44px">Back to the script</x-import>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isResults }}" hint-placeholder-val="">
+  <div data-screen-label="Shot List">
+    <div style="position:sticky;top:0;z-index:10;background:rgba(21,17,13,0.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--edge-soft)">
+      <div class="qsp-summary-inner" style="max-width:var(--content-max);margin:0 auto;padding:var(--space-3) var(--space-5);display:flex;align-items:center;gap:var(--space-6);flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+          <span class="qsp-summary-title" style="font-family:var(--font-display);font-style:italic;font-size:1.125rem;color:var(--text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">{{ resultTitle }}</span>
+          <span style="font-family:var(--font-mono);font-size:var(--fs-meta);letter-spacing:0.05em;color:var(--text-faint)">{{ resultMeta }}</span>
+        </div>
+        <div class="qsp-summary-progress" style="flex:1;min-width:170px">
+          <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.ProgressBar" value="{{ foundRatio }}" label="{{ progressLabel }}" hint-size="100%,28px"></x-import>
+        </div>
+        <div style="display:flex;align-items:center">
+          <sc-if value="{{ confirmingNew }}" hint-placeholder-val="">
+            <span style="display:flex;align-items:center;gap:var(--space-2)">
+              <span style="font-family:var(--font-body);font-style:italic;font-size:var(--fs-small);color:var(--text-muted)">Clear this map?</span>
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="danger" size="sm" on-click="{{ onConfirmNew }}" hint-size="90px,36px">Clear it</x-import>
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="ghost" size="sm" on-click="{{ onCancelNew }}" hint-size="90px,36px">Keep it</x-import>
+            </span>
+          </sc-if>
+          <sc-if value="{{ notConfirmingNew }}" hint-placeholder-val="{{ true }}">
+            <span style="display:flex;align-items:center;gap:var(--space-2)">
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="secondary" size="sm" icon="{{ copyIcon }}" on-click="{{ onCopy }}" hint-size="160px,36px">{{ copyLabel }}</x-import>
+              <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="ghost" size="sm" icon="rotate-ccw" on-click="{{ onNewScript }}" hint-size="170px,36px">Start a new script</x-import>
+            </span>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:var(--content-max);margin:0 auto;padding:var(--space-8) var(--space-5) var(--space-16)">
+      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+        <sc-for list="{{ cards }}" as="card" hint-placeholder-count="3">
+          <div class="qsp-card">
+            <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.ManuscriptCard" index="{{ card.index }}" start-time="{{ card.startTime }}" end-time="{{ card.endTime }}" excerpt="{{ card.excerpt }}" mood="{{ card.mood }}" mood-tone="{{ card.moodTone }}" clip-duration-seconds="{{ card.clip }}" terms="{{ card.terms }}" found="{{ card.found }}" on-found-change="{{ card.onFound }}" hint-size="100%,220px"></x-import>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ partial }}" hint-placeholder-val="">
+        <div style="margin-top:var(--space-8);text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-3)">
+          <p style="font-family:var(--font-body);font-style:italic;color:var(--text-muted);margin:0">The map came back unfinished — this is everything that arrived.</p>
+          <x-import component-from-global-scope="QuietFightClubDesignSystem_fae847.Button" variant="secondary" icon="arrow-right" on-click="{{ onMapRest }}" hint-size="160px,44px">Map the rest</x-import>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;backendBase&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;&quot;, &quot;tsType&quot;: &quot;string&quot;}, &quot;demoMode&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = {
+    phase: 'empty',        // empty | working | results | error
+    script: '',
+    fieldError: null,
+    result: null,
+    found: {},
+    copied: false,
+    confirmingNew: false,
+    workIdx: 0,
+    workProg: 0.06,
+  };
+
+  timers = [];
+  WPM = 150;
+  WORKING_LINES = ['Reading your script…', 'Breaking it into scenes…', 'Finding your footage…'];
+  STOP = new Set(('a an and are as at be been but by for from had has have he her his i if in into is it its me my of on or our out so than that the their them then there they this to up was we were what when which who will with you your yet not no nor do does did done just only very own same too can could would should about over under again once more most other some such').split(' '));
+  MOOD_LEXICON = [
+    [/rain|leaving|window|gone|doubt|empty|alone/i, 'wistful'],
+    [/fight|boxer|rounds|blank|cold|bark|deadline/i, 'tense'],
+    [/sunrise|begin|method|accumulat|worth|true|strong/i, 'resolute'],
+    [/quiet|silence|lamp|snow|hum|night|slow/i, 'quiet'],
+    [/city|street|train|harbor|kitchen|shop/i, 'reflective'],
+  ];
+  MOOD_CYCLE = ['reflective', 'quiet', 'resolute', 'wistful', 'tense'];
+  MOOD_TERMS = {
+    wistful: 'rain on train window',
+    tense: 'boxer wrapping hands gym',
+    resolute: 'typewriter desk lamp night',
+    quiet: 'snow falling streetlight',
+    reflective: 'empty city street night',
+  };
+  MOOD_TONES = { tense: 'oxblood', wistful: 'neutral', quiet: 'neutral', resolute: 'ember', reflective: 'neutral', hopeful: 'ember' };
+  SAMPLE_SCRIPT = [
+    'Every city has an hour when it belongs to nobody. The shops are shuttered, the trains run empty, and the streetlights hum their one long note over wet asphalt. This is the hour the essay begins.',
+    'I used to think discipline meant noise — alarms, deadlines, a coach barking counts in a cold gym. But the strongest people I ever filmed were quiet. A boxer wrapping his hands in silence. A baker flouring the bench before the ovens wake. Their fight happened long before anyone watched.',
+    'Writing is the same kind of fight. You sit at a small desk under a small lamp and you go the full twelve rounds with a blank page. Nobody cheers. The page does not care. You show up anyway, night after night, and the work accumulates like snowfall on a windowsill.',
+    'Stock footage gets a bad reputation, and some of it is earned. But choose carefully and the borrowed image becomes confession. Rain on a train window is every leaving you never explained. A kitchen light at three in the morning is every doubt you ever fed.',
+    'So this is the method. Write the truest sentence you can. Find the picture that admits it. Cut until only the fight remains — the quiet one, the one worth filming.',
+  ].join('\n\n');
+
+  componentWillUnmount() { this.clearTimers(); }
+  clearTimers() { this.timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); this.timers = []; }
+  later(fn, ms) { const t = setTimeout(fn, ms); this.timers.push(t); return t; }
+  delay(ms) { return new Promise((r) => this.later(r, ms)); }
+
+  // ── engine helpers ───────────────────────────────────────
+  countWords(t) { const m = (t || '').trim().match(/\S+/g); return m ? m.length : 0; }
+  fmtTime(sec) { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+  keywords(text, n) {
+    const freq = {};
+    (text.toLowerCase().match(/[a-z']{4,}/g) || []).forEach((w) => {
+      w = w.replace(/'s$/, '');
+      if (this.STOP.has(w)) return;
+      freq[w] = (freq[w] || 0) + 1;
+    });
+    return Object.keys(freq).sort((a, b) => freq[b] - freq[a] || b.length - a.length).slice(0, n);
+  }
+  moodFor(text, i) {
+    for (let k = 0; k < this.MOOD_LEXICON.length; k++) {
+      if (this.MOOD_LEXICON[k][0].test(text)) return this.MOOD_LEXICON[k][1];
+    }
+    return this.MOOD_CYCLE[i % this.MOOD_CYCLE.length];
+  }
+  localMap(script) {
+    const sentences = script.replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]+["']?|[^.!?…]+$/g) || [];
+    let groups = []; let cur = '';
+    sentences.forEach((s) => {
+      cur = cur ? cur + ' ' + s.trim() : s.trim();
+      if (this.countWords(cur) >= 38) { groups.push(cur); cur = ''; }
+    });
+    if (cur) {
+      if (groups.length && this.countWords(cur) < 14) groups[groups.length - 1] += ' ' + cur;
+      else groups.push(cur);
+    }
+    const MAX = 24; const partial = groups.length > MAX;
+    if (partial) groups = groups.slice(0, MAX);
+    let t = 0;
+    const segments = groups.map((g, i) => {
+      const words = this.countWords(g); const dur = (words / this.WPM) * 60; const start = t; t += dur;
+      const kw = this.keywords(g, 4); const mood = this.moodFor(g, i);
+      let terms = [];
+      if (kw.length >= 2) terms.push(kw[0] + ' ' + kw[1]); else if (kw.length === 1) terms.push(kw[0]);
+      if (kw.length >= 4) terms.push(kw[2] + ' ' + kw[3]); else if (kw.length >= 3) terms.push(kw[2] + ' close up');
+      terms.push(this.MOOD_TERMS[mood]);
+      terms = terms.filter((x, j) => x && terms.indexOf(x) === j).slice(0, 3);
+      return {
+        id: i + 1, script_text: g,
+        start_time: this.fmtTime(start), end_time: this.fmtTime(t),
+        search_terms: terms,
+        clip_duration_seconds: Math.min(15, Math.max(4, Math.round(dur * 0.4))),
+        mood,
+      };
+    });
+    const top = this.keywords(script, 2);
+    const title = top.length >= 2 ? 'The ' + this.cap(top[0]) + ' and the ' + this.cap(top[1]) : 'Untitled Essay';
+    return { video_title_suggestion: title, estimated_runtime_seconds: Math.round(t), segments, partial };
+  }
+  normalize(data) {
+    const segs = (data.segments || []).map((s, i) => ({
+      id: s.id != null ? s.id : i + 1,
+      script_text: s.script_text || '',
+      start_time: s.start_time || '0:00',
+      end_time: s.end_time || '0:00',
+      search_terms: Array.isArray(s.search_terms) ? s.search_terms : [],
+      clip_duration_seconds: s.clip_duration_seconds,
+      mood: s.mood || '',
+    }));
+    return {
+      video_title_suggestion: data.video_title_suggestion || 'Untitled Essay',
+      estimated_runtime_seconds: data.estimated_runtime_seconds || 0,
+      segments: segs,
+      partial: !!data.partial,
+    };
+  }
+
+  // ── flow ─────────────────────────────────────────────────
+  async requestMap(script) {
+    const demo = this.props.demoMode != null ? this.props.demoMode : true;
+    if (demo) {
+      await this.delay(2600);
+      if (/\[fail\]/i.test(script)) throw new Error('demo-fail');
+      return this.localMap(script);
+    }
+    const base = this.props.backendBase || '';
+    const res = await fetch(base + '/api/map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script }),
+    });
+    if (!res.ok) throw new Error('bad status ' + res.status);
+    return this.normalize(await res.json());
+  }
+
+  startWorkingTicker() {
+    this.timers.push(setInterval(() => this.setState((s) => ({ workIdx: Math.min(s.workIdx + 1, this.WORKING_LINES.length - 1) })), 1300));
+    this.timers.push(setInterval(() => this.setState((s) => ({ workProg: Math.min(0.92, s.workProg + (0.92 - s.workProg) * 0.18) })), 220));
+  }
+
+  async startMapping() {
+    const words = this.countWords(this.state.script);
+    if (words === 0) { this.setState({ fieldError: "There's no script here yet. Paste it in and we'll get to work." }); return; }
+    if (words < 100) { this.setState({ fieldError: 'This looks like a fragment. Paste the full script for a proper shot list.' }); return; }
+    this.setState({ fieldError: null, phase: 'working', workIdx: 0, workProg: 0.06 });
+    this.startWorkingTicker();
+    try {
+      const result = await this.requestMap(this.state.script);
+      this.clearTimers();
+      this.setState({ result, found: {}, phase: 'results' });
+    } catch (e) {
+      this.clearTimers();
+      this.setState({ phase: 'error' });
+    }
+  }
+
+  setFound(id, v) { this.setState((s) => ({ found: Object.assign({}, s.found, { [id]: v }) })); }
+
+  buildMarkdown() {
+    const r = this.state.result; const found = this.state.found;
+    const lines = [
+      '# ' + r.video_title_suggestion, '',
+      'Total: ' + r.segments.length + ' segments · ≈' + this.fmtTime(r.estimated_runtime_seconds) + ' runtime', '',
+      '| # | Time | Script | Mood | Clip | Search terms | Found |',
+      '| --- | --- | --- | --- | --- | --- | --- |',
+    ];
+    r.segments.forEach((s) => {
+      lines.push('| ' + String(s.id).padStart(2, '0') + ' | ' + s.start_time + '–' + s.end_time + ' | ' +
+        s.script_text.replace(/\|/g, '\\|') + ' | ' + s.mood + ' | ~' + s.clip_duration_seconds + 's | ' +
+        s.search_terms.join(' · ') + ' | ' + (found[s.id] ? '✓' : '') + ' |');
+    });
+    return lines.join('\n');
+  }
+  copyForNotion() {
+    const md = this.buildMarkdown();
+    const done = () => { this.setState({ copied: true }); this.later(() => this.setState({ copied: false }), 2000); };
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = md; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta); done();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(md).then(done, fallback);
+    else fallback();
+  }
+
+  resetAll() { this.clearTimers(); this.setState({ script: '', result: null, found: {}, confirmingNew: false, fieldError: null, phase: 'empty' }); }
+
+  renderVals() {
+    const s = this.state;
+    const r = s.result;
+    const words = this.countWords(s.script);
+    const wordMeta = words.toLocaleString() + ' ' + (words === 1 ? 'word' : 'words') + ' · ≈' + this.fmtTime((words / this.WPM) * 60) + ' narration';
+
+    const total = r ? r.segments.length : 0;
+    const foundCount = r ? r.segments.filter((seg) => s.found[seg.id]).length : 0;
+    const cards = r ? r.segments.map((seg, i) => ({
+      index: seg.id,
+      startTime: seg.start_time,
+      endTime: seg.end_time,
+      excerpt: seg.script_text,
+      mood: seg.mood,
+      moodTone: this.MOOD_TONES[seg.mood] || 'neutral',
+      clip: seg.clip_duration_seconds,
+      terms: seg.search_terms,
+      found: !!s.found[seg.id],
+      onFound: (v) => this.setFound(seg.id, v),
+    })) : [];
+
+    return {
+      isEmpty: s.phase === 'empty',
+      isWorking: s.phase === 'working',
+      isError: s.phase === 'error',
+      isResults: s.phase === 'results' && !!r,
+
+      script: s.script,
+      onScript: (v) => this.setState({ script: v, fieldError: s.fieldError ? null : s.fieldError }),
+      wordMeta,
+      fieldError: s.fieldError,
+      onSample: () => this.setState({ script: this.SAMPLE_SCRIPT, fieldError: null }),
+      onMap: () => this.startMapping(),
+
+      workingLine: this.WORKING_LINES[s.workIdx],
+      workingProgress: s.workProg,
+
+      errorMessage: "The mapping engine didn't answer. Wait a moment and try again.",
+      onRetry: () => this.startMapping(),
+      onBack: () => this.setState({ phase: 'empty' }),
+
+      resultTitle: r ? r.video_title_suggestion : '',
+      resultMeta: r ? (total + ' segments · ≈' + this.fmtTime(r.estimated_runtime_seconds) + ' runtime') : '',
+      foundRatio: total ? foundCount / total : 0,
+      progressLabel: foundCount + ' of ' + total + ' segments clipped',
+
+      confirmingNew: s.confirmingNew,
+      notConfirmingNew: !s.confirmingNew,
+      onConfirmNew: () => this.resetAll(),
+      onCancelNew: () => this.setState({ confirmingNew: false }),
+      onNewScript: () => this.setState({ confirmingNew: true }),
+      copyIcon: s.copied ? 'check' : 'copy',
+      copyLabel: s.copied ? 'Copied' : 'Copy for Notion',
+      onCopy: () => this.copyForNotion(),
+
+      cards,
+      partial: r ? r.partial : false,
+      onMapRest: () => this.setState((st) => ({ result: Object.assign({}, st.result, { partial: false }) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

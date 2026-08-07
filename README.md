@@ -8,10 +8,18 @@ returns finished, sellable, promotable things — your story, on the shelf. It's
 free, open-source, and runs on free-tier or fully-local AI. No accounts, no
 billing, no paid AI keys.
 
-## Four services
+## Five services
 - **Format** — turn a manuscript (DOCX/RTF/TXT) into a beautiful, themed EPUB. No AI at all.
 - **Blurb** — turn a manuscript into back-cover copy, taglines, and store keywords.
-- **Promote** — turn a written piece into a stock-footage shot list for a promo video.
+- **Scout** — find out what people are actually asking *before* you write. Seed
+  phrases pull live autocomplete from Google, YouTube, Bing, Yahoo, and Yandex
+  (what people are typing, not just what they posted); subreddits pull recent
+  discussion. Synthesis is **bring-your-own-prompt** — the editorial instruction
+  lives in a textbox in your browser, never in this codebase.
+- **Promote** — turn a written piece into a stock-footage shot list for a promo
+  video. Once you have a shot list, two studios open on top of it:
+  **Thumbnail Studio** (1280×720 YouTube thumbnails — hook extraction, stock or
+  uploaded faces, three layouts, PNG export) and **Narrate** (voice-over drafting).
 - **Story Map** — turn a manuscript into a character/relationship map. A *mirror*:
   it reflects what's on the page and never invents. When there's nothing to
   reflect, the opt-in **Imagine** door lets you ask it to dream a cast up instead
@@ -76,8 +84,8 @@ quiet-shelf health
 for a fresh take. Every CLI command runs in-process with the same provider
 config as the server.
 
-## Screenshots
-
+**Scout is web-UI only** — it has no CLI command, because its synthesis step is
+built around a prompt you write and revise in the browser.
 
 ## A note on EPUBs
 

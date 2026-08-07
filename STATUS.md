@@ -1,6 +1,6 @@
 # Quiet Shelf — STATUS
 
-_Continuity doc. Last updated 2026-07-18. Read this first on any return._
+_Continuity doc. Last updated 2026-08-07. Read this first on any return._
 
 ## Where it stands: **LIVE IN PRODUCTION**
 
@@ -13,42 +13,63 @@ all the time." Work is paused at a clean stopping point.
 
 ## Production environment
 
-| | |
-|---|---|
-| Host | Hetzner CPX22 (2 vCPU / 4 GB / 80 GB), Ubuntu 26.04, Falkenstein |
-| IP | 167.233.217.220 |
-| Domain | quietshelf.studio (Porkbun; A records @ and www → the IP) |
-| TLS | Let's Encrypt via certbot --nginx; **expires 2026-10-09**, auto-renews |
-| App | systemd unit `quietshelf.service`, uvicorn on :8000, `Restart=always` |
-| Proxy | nginx → 127.0.0.1:8000 (`/etc/nginx/sites-available/quietshelf`) |
-| Code | `/root/quietshelf` (git clone, **pull-only** — no push creds by design) |
-| Provider | Groq, `llama-3.3-70b-versatile` |
-| Swap | 2 GB swapfile (box shipped with 0) |
-| Firewall | ufw: OpenSSH + Nginx Full |
+Small Linux VPS, Ubuntu, nginx terminating HTTPS (Let's Encrypt, auto-renewing)
+in front of uvicorn on localhost, managed by a systemd unit with
+`Restart=always`. LLM provider: Groq, `llama-3.3-70b-versatile`.
+
+**Host specifics — IP, paths, unit name, firewall rules — live in
+`DEPLOY.local.md`, which is gitignored.** This repo is public; infrastructure
+detail does not belong in it.
 
 ### Deploying an update
 ```bash
-# on Windows: commit + push
+# locally: commit + push
 git add -A && git commit -m "..." && git push
 
-# on the server:
-cd /root/quietshelf && git pull && systemctl restart quietshelf
-systemctl status quietshelf --no-pager
+# on the server: pull and restart (exact commands in DEPLOY.local.md)
 ```
-Runbook: `/mnt/user-data/outputs/DEPLOY_Hetzner.md` (from the launch session).
 
-**Two-terminal rule:** `vikra@Legion7 MINGW64` = Windows (git push lives here).
-`root@ubuntu-4gb-fsn1-1` = server (systemctl/nginx/certbot live here). The
-server cannot push to GitHub and doesn't need to.
+**Two-terminal rule:** the local shell is where `git push` lives; the server
+shell is where systemctl/nginx/certbot live. The server has no push credentials
+by design and doesn't need any.
 
-## The four tabs
+## The five tabs
 
 | Tab | What it does | State |
 |---|---|---|
 | **Format** | DOCX/RTF/TXT → themed EPUB. **No AI.** Always works even when the AI quota is dry. | Live |
 | **Blurb** | Manuscript → back-cover copy, taglines, keywords | Live |
+| **Scout** | Seed phrases + subreddits → live search-autocomplete and discussion material, then bring-your-own-prompt synthesis | Live |
 | **Promote** | Writing → stock-footage shot list, with orientation filter | Live |
 | **Story Map** | Manuscript → **corkboard** of characters/relationships (a mirror; opt-in Imagine invents, always stamped) | Live |
+
+Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
+(1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
+
+## Shipped 2026-08-07
+
+- **Scout tab** — new independent service (`app/services/scout/`): `/api/scout/harvest`
+  (search autocomplete across 5 engines + subreddit discussion) and
+  `/api/scout/synthesize` (one waterfall call, bring-your-own-prompt, word-capped
+  at 6000 material / 2500 prompt so one request can't eat the day's quota).
+  Verified live: harvest returns real autocomplete material; empty request 422s.
+- **Thumbnail Studio** and **Narrate**, mounted as sub-studios inside Promote.
+- **Landing page gains a Scout door** — full-width, spanning both columns
+  between the two rows (`.qs-door--wide`). Applied from the design drop-in.
+- **`/api/health` now reports `scout`** — the services list was hardcoded and had
+  gone stale, under-reporting what the app actually mounts.
+- **Test collection repaired.** `tests/qs_e2e_test.py` matched pytest's default
+  `*_test.py` glob, so pytest imported it during collection — where its
+  module-level `sys.exit()` raised `INTERNALERROR` and **aborted the entire
+  suite** (and fired live E2E traffic at production on every `pytest` run).
+  `pyproject.toml` now pins `python_files = ["test_*.py"]`. The script still runs
+  standalone: `python tests/qs_e2e_test.py`. **178 tests pass in ~18s** (they had
+  been running zero).
+- **Repo hygiene / public-repo scrub.** `_live.log`, `tests/test-run.log`, and
+  `tests/test-report.log` were tracked and embedded local `C:\Users\...` paths —
+  untracked (kept on disk) and gitignored, along with `/data/` scout snapshots.
+  Production infrastructure detail (IP, host spec, paths, firewall, shell
+  prompts) moved out of this public file into gitignored `DEPLOY.local.md`.
 
 ## Shipped in the launch session (2026-07-11 → 07-12)
 
@@ -103,9 +124,9 @@ server cannot push to GitHub and doesn't need to.
   `{event, tab, duration_seconds, ts}` to `events.jsonl`, frontend timing on
   tab switch + `navigator.sendBeacon` on close, one honest disclosure line on
   About. Meanwhile nginx access logs already answer "how many visitors, which
-  endpoints" (`awk '{print $7}' /var/log/nginx/access.log | sort | uniq -c | sort -rn`).
-- **No admin view for feedback.** Read it with
-  `cat /root/quietshelf/feedback.jsonl`. Nothing notifies you. Planned: a
+  endpoints" (one-liner in `DEPLOY.local.md`).
+- **No admin view for feedback.** Read `feedback.jsonl` on the server directly.
+  Nothing notifies you. Planned: a
   `GET /api/feedback` route gated by an `ADMIN_CODE` in `.env` (404s when
   unset, so self-hosters never expose a door they didn't configure).
 - **Format:** an uploaded file does not survive a page refresh.

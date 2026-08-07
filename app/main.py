@@ -1,4 +1,4 @@
-"""Quiet Shelf: one FastAPI app mounting four independent services, plus a
+"""Quiet Shelf: one FastAPI app mounting five independent services, plus a
 health check and the static frontend."""
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from app.services.blurb.router import router as blurb_router
 from app.services.format.router import router as format_router
 from app.services.promote.router import router as promote_router
 from app.services.storymap.router import router as storymap_router
+from app.services.scout.router import router as scout_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +69,7 @@ app.include_router(format_router)
 app.include_router(blurb_router)
 app.include_router(promote_router)
 app.include_router(storymap_router)
+app.include_router(scout_router)
 
 
 @app.get("/api/health")
@@ -75,7 +77,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "provider": config.provider_name(),
-        "services": ["format", "blurb", "promote", "storymap"],
+        "services": ["format", "blurb", "promote", "storymap", "scout"],
     }
 
 

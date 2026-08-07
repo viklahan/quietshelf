@@ -152,11 +152,18 @@ def _search_term(client: httpx.Client, term: str, n: int) -> list[dict]:
     return []
 
 
-def get_cover_suggestions(title: str, passage: str = "", n: int = 3) -> list[dict]:
+def get_cover_suggestions(title: str, passage: str = "", n: int = 3, exact: bool = False) -> list[dict]:
     """Up to n photo suggestions, ideally one per extracted term for variety.
+    `exact=True` searches the title verbatim as the single term - used by the
+    Thumbnail Studio, whose queries are already search-ready and whose variety
+    depends on them reaching the photo APIs UNMANGLED. Term extraction (and
+    its static fallback terms) is for book-cover passages only.
     Returns [] when nothing can be sourced. Never raises."""
-    n = max(1, min(5, n))
-    terms = _extract_terms(title or "untitled story", passage)
+    n = max(1, min(12, n))
+    if exact:
+        terms = [title.strip() or "portrait"]
+    else:
+        terms = _extract_terms(title or "untitled story", passage)
     pools: list[list[dict]] = []
     with httpx.Client(timeout=_TIMEOUT, follow_redirects=True) as client:
         for term in terms:

@@ -1,13 +1,23 @@
-/* Quiet Shelf — Home. Name, one warm line, three soft doorways, the shelf. */
+/* Quiet Shelf — Home. Name, one warm line, the doorways, the shelf.
+   Scout sits as a full-width door between the two rows. */
 const QSDS_home = window.QuietFightClubDesignSystem_fae847;
 const { Icon: QSIconHome } = QSDS_home;
 
-function Door({ icon, title, line, onOpen }) {
+function Door({ icon, title, line, wide, onOpen }) {
   return (
-    <button type="button" className="qs-door" onClick={onOpen}>
+    <button type="button" className={`qs-door${wide ? ' qs-door--wide' : ''}`} onClick={onOpen}>
       <span className="qs-door__ico"><QSIconHome name={icon} size={20} /></span>
-      <h2 className="qs-door__title">{title}</h2>
-      <p className="qs-door__line">{line}</p>
+      {wide ? (
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', minWidth: 0 }}>
+          <h2 className="qs-door__title">{title}</h2>
+          <p className="qs-door__line">{line}</p>
+        </span>
+      ) : (
+        <>
+          <h2 className="qs-door__title">{title}</h2>
+          <p className="qs-door__line">{line}</p>
+        </>
+      )}
       <span className="qs-door__go">Open<QSIconHome name="arrow-right" size={13} /></span>
     </button>
   );
@@ -38,6 +48,13 @@ function Home({ onNavigate }) {
           title="Blurb"
           line="Find the words to describe your book."
           onOpen={() => onNavigate('blurb')}
+        />
+        <Door
+          icon="sparkles"
+          title="Scout"
+          line="Hear what people are asking right now, before you write."
+          wide
+          onOpen={() => onNavigate('scout')}
         />
         <Door
           icon="film"
