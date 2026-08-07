@@ -7,9 +7,15 @@ _Continuity doc. Last updated 2026-08-07. Read this first on any return._
 **https://quietshelf.studio** — real domain, real HTTPS, real users.
 **Repo:** https://github.com/viklahan/quietshelf (public, MIT)
 
-Four services work, are hardened, and are running in production. First real
+Five services work, are hardened, and are running in production. First real
 user (a writer friend) has been testing since 07-12 and reports he'll "use it
 all the time." Work is paused at a clean stopping point.
+
+**Live risk as of 08-07: provider health, not code.** All four waterfall legs
+were degraded simultaneously — OpenRouter trickling, Gemini 429 (free tier
+20 req/day exhausted), Groq 400 `json_validate_failed`, Cerebras 402 payment
+required. Groq is carrying the app. Worth choosing a dependable leg before the
+next demo rather than discovering this live again.
 
 ## Production environment
 
@@ -45,6 +51,46 @@ by design and doesn't need any.
 
 Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
 (1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
+
+## Shipped 2026-08-07 (late) — the Promote outage
+
+**Symptom:** a DOCX that mapped in 15–30s locally starved on the live site and
+failed with "Timed out waiting for chunks" after ~3 minutes.
+
+**Root cause: an HTTP client timeout is not a deadline.** OpenRouter (first in
+`WATERFALL_ORDER`, `openai/gpt-oss-20b:free`) returned 200 *headers* in ~5s then
+dribbled the response body for 8+ minutes. httpx applies `read` PER SOCKET READ,
+so any byte arriving before the timer expires resets it — `LLM_TIMEOUT_SECONDS`
+(120s) never fired, `ProviderTimeout` was never raised, the waterfall never fell
+through, and the promote stream gave up at `SSE_WAIT_TIMEOUT=180`.
+
+**Fix (545832f):** `PROVIDER_DEADLINE_SECONDS = 45` gives each leg a true
+wall-clock budget (daemon thread pool); expiry raises `ProviderTimeout`, turning
+a silent hang into the honest failure the waterfall already handles. Plus
+`TIMEOUT_STREAK_LIMIT = 2` → 300s cooldown so later chunks skip a bad leg at
+zero cost; any success resets the streak. 182 tests pass (3 new regressions,
+including a provider that never raises and never returns).
+
+Same `VIDEO15.docx`, one variable changed:
+
+| Ladder | Result |
+|---|---|
+| `openrouter,gemini,groq,cerebras` (before) | 180.2s, **0/3 chunks, failed** |
+| `gemini,groq,cerebras` | 41.7s, 3/3 ✓ |
+| openrouter first **+ fix** | 186.4s, 3/3 ✓ |
+
+**Debugging method worth reusing:** md5 the served assets against local first —
+all 18 static files were byte-identical, which exonerated the code and the
+deploy immediately and pointed at environment. Then A/B one variable on one
+machine. Then `faulthandler.dump_traceback()` from a watchdog thread to see
+*where* it blocks; that stack (`httpcore._receive_response_body`) is what
+disproved the initial "it's timing out at 120s" theory. **Note: httpx logs
+`"HTTP Request ... 200 OK"` when HEADERS arrive, not the body — it is not proof
+the call succeeded.**
+
+**Deploy note:** the fix makes degradation graceful; it does not make a sick
+provider fast. Until provider health recovers, prod wants
+`WATERFALL_ORDER=gemini,groq,cerebras` in its `.env`.
 
 ## Shipped 2026-08-07
 
