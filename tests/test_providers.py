@@ -408,3 +408,90 @@ def test_a_trickling_provider_is_cut_off_by_the_wall_clock_deadline(monkeypatch)
     # It must give up on the trickler and serve from the healthy leg promptly.
     assert elapsed < 10, f"waterfall waited {elapsed:.1f}s on a trickling leg"
     assert fast.calls == 1
+
+
+# ── Groq model ladder: per-MODEL failures must not kill the whole leg ─────────
+# 2026-08-07: the primary (openai/gpt-oss-120b) was rate-limited and
+# qwen3.6-27b returned 400 json_validate_failed, while openai/gpt-oss-20b served
+# the same prompt fine in 1.6s. Neither failure walked the ladder, so the whole
+# Groq leg died and Promote fell back to keyword garbage for 86% of segments.
+# A rate limit or a JSON-mode rejection is a fact about THAT MODEL, not proof
+# the provider is unusable.
+
+def _groq_client(monkeypatch, behaviour):
+    """behaviour: {model_name: Exception-to-raise | str-to-return}"""
+    from app.providers import groq as groq_mod
+
+    tried: list[str] = []
+
+    class _Completions:
+        def create(self, **kwargs):
+            model = kwargs["model"]
+            tried.append(model)
+            outcome = behaviour.get(model)
+            if isinstance(outcome, Exception):
+                raise outcome
+            msg = type("M", (), {"content": outcome})
+            return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.chat = type("Chat", (), {"completions": _Completions()})
+
+    monkeypatch.setattr(groq_mod.groq_sdk, "Groq", _Client)
+    monkeypatch.setattr(groq_mod, "acquire_slot", lambda *a, **k: None)
+    return tried
+
+
+def _groq_err(cls, message):
+    """Build a groq SDK error without going through its real HTTP plumbing."""
+    exc = cls.__new__(cls)
+    Exception.__init__(exc, message)
+    return exc
+
+
+def test_groq_ladder_walks_past_a_rate_limited_model(monkeypatch):
+    from app.providers import groq as groq_mod
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "primary-model")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["primary-model", "backup-model"])
+    tried = _groq_client(monkeypatch, {
+        "primary-model": _groq_err(groq_mod.groq_sdk.RateLimitError, "429 rate limit reached for primary-model"),
+        "backup-model": '{"ok": true}',
+    })
+
+    assert GroqProvider().generate(SYSTEM, USER) == '{"ok": true}'
+    assert tried == ["primary-model", "backup-model"], f"ladder tried {tried}"
+
+
+def test_groq_ladder_walks_past_json_validate_failed(monkeypatch):
+    from app.providers import groq as groq_mod
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "primary-model")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["primary-model", "backup-model"])
+    tried = _groq_client(monkeypatch, {
+        "primary-model": _groq_err(
+            groq_mod.groq_sdk.BadRequestError,
+            "400 - {'error': {'message': \"Failed to validate JSON. Please adjust your prompt.\", "
+            "'code': 'json_validate_failed'}}"),
+        "backup-model": '{"ok": true}',
+    })
+
+    assert GroqProvider().generate(SYSTEM, USER) == '{"ok": true}'
+    assert tried == ["primary-model", "backup-model"], f"ladder tried {tried}"
+
+
+def test_groq_all_models_rate_limited_still_reports_rate_limited(monkeypatch):
+    """Exhausting the ladder on 429s must surface as ProviderRateLimited so the
+    waterfall's cooldown logic still sees the truth."""
+    from app.providers import groq as groq_mod
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "primary-model")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["primary-model", "backup-model"])
+    _groq_client(monkeypatch, {
+        "primary-model": _groq_err(groq_mod.groq_sdk.RateLimitError, "429 rate limit"),
+        "backup-model": _groq_err(groq_mod.groq_sdk.RateLimitError, "429 rate limit"),
+    })
+
+    with pytest.raises(ProviderRateLimited):
+        GroqProvider().generate(SYSTEM, USER)

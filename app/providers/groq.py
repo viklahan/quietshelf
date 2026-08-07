@@ -50,6 +50,7 @@ class GroqProvider(Provider):
         models_to_try = [primary] + [m for m in fallbacks if m != primary]
 
         last_exc: Exception | None = None
+        rate_limited = False  # at least one model on the ladder returned 429
         for model in models_to_try:
             kwargs: dict = {
                 "model": model,
@@ -66,7 +67,14 @@ class GroqProvider(Provider):
                     logger.warning("groq: fell through to fallback model=%s", model)
                 return response.choices[0].message.content or ""
             except groq_sdk.RateLimitError as exc:
-                raise ProviderRateLimited(str(exc)) from exc
+                # Groq rate-limits PER MODEL. A 429 on this one says nothing
+                # about the next one on the ladder — walking it is free and
+                # often lands immediately. Only when every model is throttled
+                # is the whole leg genuinely rate-limited (raised below).
+                logger.warning("groq: model %s rate-limited, trying next", model)
+                last_exc = exc
+                rate_limited = True
+                continue
             except groq_sdk.APITimeoutError as exc:
                 raise ProviderTimeout(str(exc)) from exc
             except groq_sdk.NotFoundError as exc:
@@ -82,6 +90,11 @@ class GroqProvider(Provider):
                 dead_model = any(k in msg.lower() for k in (
                     "decommission", "deprecat", "model_not_found",
                     "does not exist", "invalid model", "no longer supported",
+                    # This model cannot honour response_format=json_object for
+                    # our prompt (Groq: "Failed to validate JSON"). That is a
+                    # fact about the MODEL, not the provider — the next one on
+                    # the ladder may serve it fine, and on 2026-08-07 one did.
+                    "json_validate_failed", "failed to validate json",
                 ))
                 if dead_model:
                     logger.warning("groq: model %s rejected (%.200s), trying next", model, msg)
@@ -93,6 +106,12 @@ class GroqProvider(Provider):
                 # symptom, the message is the diagnosis.
                 raise ProviderError(f"Groq API error: {type(exc).__name__}: {str(exc)[:300]}") from exc
 
+        if rate_limited:
+            # Every model was throttled — the waterfall should treat this as a
+            # rate limit (retryable, cools down) rather than a hard error.
+            raise ProviderRateLimited(
+                f"All Groq models rate-limited. Tried: {models_to_try}. Last: {last_exc}"
+            )
         raise ProviderError(
             f"No working Groq model found. Tried: {models_to_try}. Last: {last_exc}"
         )
