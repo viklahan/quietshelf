@@ -57,6 +57,15 @@ const QS_SCOUT_STARTER_PROMPT = [
   'Voice: second person, calm. No self-help vocabulary.',
 ].join('\n');
 
+const QS_SCOUT_PROMPT_PREV_KEY = 'qs-scout-prompt-prev';
+
+function scoutLoadPrevPrompt() {
+  try { return window.localStorage.getItem(QS_SCOUT_PROMPT_PREV_KEY) || ''; } catch (e) { return ''; }
+}
+function scoutSavePrevPrompt(v) {
+  try { window.localStorage.setItem(QS_SCOUT_PROMPT_PREV_KEY, v); } catch (e) {}
+}
+
 function scoutLoadPrompt() {
   try { return window.localStorage.getItem(QS_SCOUT_PROMPT_KEY) || ''; } catch (e) { return ''; }
 }
@@ -104,7 +113,30 @@ function ScoutPage() {
   const [synth, setSynth] = React.useState(null);      // {result, material_truncated}
   const [synthCopied, setSynthCopied] = React.useState(false);
 
+  const [clearArmed, setClearArmed] = React.useState(false);
+  const clearTimerRef = React.useRef(null);
+  const [prevPrompt, setPrevPrompt] = React.useState(scoutLoadPrevPrompt);
+
   function updatePrompt(v) { setPrompt(v); scoutSavePrompt(v); }
+
+  function clearPrompt() {
+    if (!clearArmed) {
+      setClearArmed(true);
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = setTimeout(function () { setClearArmed(false); }, 3000);
+      return;
+    }
+    clearTimeout(clearTimerRef.current);
+    setClearArmed(false);
+    // Safety net: bank the outgoing prompt - a blank slate, never a loss.
+    scoutSavePrevPrompt(prompt);
+    setPrevPrompt(prompt);
+    updatePrompt('');
+  }
+
+  function restorePrevPrompt() {
+    if (prevPrompt) updatePrompt(prevPrompt);
+  }
 
   function synthesize() {
     if (!result || !prompt.trim() || synthBusy) return;
@@ -293,11 +325,24 @@ function ScoutPage() {
                 placeholder="Paste your editorial research prompt here. It stays in your browser."
                 onChange={function (e) { updatePrompt(e.target.value); }} />
               {!prompt.trim() ? (
+                <div className="qs-groundrow" style={{ gap: 'var(--space-3)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <button type="button" className="qs-payoff__again"
+                    onClick={function () { updatePrompt(QS_SCOUT_STARTER_PROMPT); }}>
+                    <Icon name="sparkles" size={13} />Load a starter prompt
+                  </button>
+                  {prevPrompt ? (
+                    <button type="button" className="qs-payoff__again" onClick={restorePrevPrompt}>
+                      Restore previous prompt
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
                 <button type="button" className="qs-payoff__again" style={{ marginTop: 'var(--space-2)' }}
-                  onClick={function () { updatePrompt(QS_SCOUT_STARTER_PROMPT); }}>
-                  <Icon name="sparkles" size={13} />Load a starter prompt
+                  onClick={clearPrompt}
+                  aria-label={clearArmed ? 'Confirm starting a new prompt' : 'Start a new prompt'}>
+                  <Icon name="x" size={13} />{clearArmed ? 'Start fresh?' : 'New prompt'}
                 </button>
-              ) : null}
+              )}
             </div>
           </div>
           <div className="qs-actionrow" style={{ justifyContent: 'flex-start', gap: 'var(--space-3)' }}>

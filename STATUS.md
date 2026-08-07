@@ -39,7 +39,7 @@ by design and doesn't need any.
 |---|---|---|
 | **Format** | DOCX/RTF/TXT → themed EPUB. **No AI.** Always works even when the AI quota is dry. | Live |
 | **Blurb** | Manuscript → back-cover copy, taglines, keywords | Live |
-| **Scout** | Seed phrases + subreddits → live search-autocomplete and discussion material, then bring-your-own-prompt synthesis | Live |
+| **Scout** | Seed phrases → live search-autocomplete material (5 engines), then bring-your-own-prompt synthesis. Subreddit sources are BUILT but hidden behind `QS_SCOUT_REDDIT_ENABLED=false` in `scout.jsx` pending Reddit API approval. | Live |
 | **Promote** | Writing → stock-footage shot list, with orientation filter | Live |
 | **Story Map** | Manuscript → **corkboard** of characters/relationships (a mirror; opt-in Imagine invents, always stamped) | Live |
 
@@ -47,6 +47,26 @@ Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
 (1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
 
 ## Shipped 2026-08-07
+
+- **Reddit compliance.** Reddit's Responsible Builder Policy (June 2026) requires
+  explicit approval for API access and prohibits masking identity. All UA-spoofing
+  fallbacks were REMOVED (permanent test enforces the honest QuietShelf UA);
+  app-only OAuth is built and dormant (`REDDIT_CLIENT_ID`/`SECRET` in `.env` +
+  flag flip activates it once an access ticket is approved). Anonymous access
+  403s from all tested networks — that's the policy, not a bug.
+- **Scout UX**: clear-prompt button (two-click arm/confirm, 3s stand-down);
+  FastAPI array-shaped 422 details now render as sentences, never
+  `[object Object]`.
+- **Thumbnail Studio**: corner-handle text resize (0.45–1.7×, preview-only —
+  export repaints without the handle); `exact` mode through the cover-suggestions
+  stack (frontend queries reach photo APIs unmangled; router + service n-clamps
+  raised 5→12) — fixes recycled faces. Regression: `tests/test_cover_exact.py`
+  includes a full-HTTP-path test because the router clamp hid from unit tests.
+- **E2E unified**: `tests/qs_e2e_test.py` is the ONLY copy (root duplicate
+  removed). AI-consuming tests (blurb, promote stream) are opt-in via `--ai`
+  and minimal when on (1 blurb call, 1.2K-word stream) — the default run
+  provably makes zero AI calls and never burns server quota. Includes Scout
+  section (harvest + 422 check). `is_zipfile` misuse fixed via `BytesIO`.
 
 - **Scout tab** — new independent service (`app/services/scout/`): `/api/scout/harvest`
   (search autocomplete across 5 engines + subreddit discussion) and

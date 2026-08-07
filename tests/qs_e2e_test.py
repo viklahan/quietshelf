@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Quiet Shelf end-to-end smoke test.
-Run from Legion7: python3 qs_e2e_test.py
+Run from Legion7: python tests/qs_e2e_test.py  (add --ai to include AI tests)
 Tests every tab's browse/paste path against the live site.
 """
 import sys
@@ -21,6 +21,10 @@ except ImportError:
     sys.exit(1)
 
 BASE = "https://quietshelf.studio"
+# AI-consuming tests (blurb synthesis, promote mapping) are OPT-IN: they spend
+# real provider quota on the server, which is production capacity. Default run
+# costs zero AI calls. Enable with:  python tests/qs_e2e_test.py --ai
+AI_TESTS = "--ai" in sys.argv
 PASS = 0
 FAIL = 0
 RESULTS = []
@@ -104,6 +108,7 @@ def make_docx(text, path):
 
 STORY_8K = make_story_text(8000)
 STORY_5K = " ".join(STORY_8K.split()[:5000])
+STORY_1K = " ".join(STORY_8K.split()[:1200])
 STORY_100 = " ".join(STORY_8K.split()[:150])
 
 print(f"\nTest content: 8K={len(STORY_8K.split())}w  5K={len(STORY_5K.split())}w  100={len(STORY_100.split())}w")
@@ -197,42 +202,28 @@ with tempfile.TemporaryDirectory() as tmp:
 # ── 3. BLURB TAB ─────────────────────────────────────────────────────────────
 section("3. BLURB TAB")
 
-for tone in ["warm", "literary", "punchy", "mysterious"]:
+if not AI_TESTS:
+    print("  SKIP  Blurb tests (AI quota) — run with --ai to include")
+else:
+    # ONE call, one tone: the smoke question is "does blurb work", and every
+    # tone rides the same code path. Four tones was quota gluttony.
     try:
-        print(f"  ...  Blurb tone={tone}")
-        sys.stdout.flush()
         t0 = time.time()
         r = requests.post(BASE + "/api/blurb",
-            data={"text": STORY_5K, "tone": tone, "length": "medium"},
-            timeout=120)
+            data={"text": STORY_1K, "tone": "warm", "length": "medium"},
+            timeout=60)
         elapsed = round(time.time() - t0, 1)
         if r.status_code == 200:
             d = r.json()
             has_blurb = bool(d.get("back_cover") or (d.get("back_cover_variants") and d["back_cover_variants"][0]))
             if has_blurb:
-                ok(f"Blurb tone={tone}", f"{elapsed}s")
+                ok("Blurb tone=warm", f"{elapsed}s")
             else:
-                fail(f"Blurb tone={tone}", "no back_cover in response")
+                fail("Blurb tone=warm", "no back_cover in response")
         else:
-            fail(f"Blurb tone={tone}", f"HTTP {r.status_code}: {r.text[:150]}")
+            fail("Blurb tone=warm", f"HTTP {r.status_code}: {r.text[:150]}")
     except Exception as e:
-        fail(f"Blurb tone={tone}", str(e))
-
-with tempfile.TemporaryDirectory() as tmp:
-    docx_path = os.path.join(tmp, "story.docx")
-    if make_docx(STORY_8K, docx_path):
-        try:
-            r = requests.post(BASE + "/api/blurb",
-                files={"file": ("story.docx", open(docx_path, "rb"),
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
-                data={"tone": "warm", "length": "short"},
-                timeout=120)
-            if r.status_code == 200 and r.json().get("back_cover"):
-                ok("Blurb DOCX browse", f"{len(r.json().get('back_cover',''))} chars")
-            else:
-                fail("Blurb DOCX browse", f"HTTP {r.status_code}")
-        except Exception as e:
-            fail("Blurb DOCX browse", str(e))
+        fail("Blurb tone=warm", str(e))
 
 # ── 4. PROMOTE TAB ───────────────────────────────────────────────────────────
 section("4. PROMOTE TAB")
@@ -271,19 +262,19 @@ with tempfile.TemporaryDirectory() as tmp:
         except Exception as e:
             fail("Promote extract DOCX", str(e))
 
-# Test streaming with 5K words (paste path)
-print("  ...  Promote stream 5K (may take 60-120s, showing progress)")
-sys.stdout.flush()
-try:
+# Test streaming (paste path) — AI-hungry: every chunk is a provider call
+if not AI_TESTS:
+    print("  SKIP  Promote stream (AI quota) — run with --ai to include")
+else:
+  try:
     t0 = time.time()
-    STREAM_TIMEOUT = 180
     r = requests.post(BASE + "/api/promote/stream",
-        json={"script": STORY_5K},
+        json={"script": STORY_1K},
         headers={"Accept": "text/event-stream"},
         stream=True,
-        timeout=STREAM_TIMEOUT)
+        timeout=180)
     if r.status_code != 200:
-        fail("Promote stream 5K", f"HTTP {r.status_code}: {r.text[:150]}")
+        fail("Promote stream 1K", f"HTTP {r.status_code}: {r.text[:150]}")
     else:
         chunks_received = 0
         total_chunks = 0
@@ -297,15 +288,9 @@ try:
                 evt = json.loads(line[6:])
                 if evt["type"] == "meta":
                     total_chunks = evt.get("total_chunks", 0)
-                    print(f"      chunks expected: {total_chunks}")
-                    sys.stdout.flush()
                 elif evt["type"] == "chunk":
                     chunks_received += 1
-                    segs = len(evt.get("segments", []))
-                    segments_total += segs
-                    elapsed_so_far = round(time.time() - t0, 1)
-                    print(f"      chunk {chunks_received}/{total_chunks} — {segs} segs — {elapsed_so_far}s")
-                    sys.stdout.flush()
+                    segments_total += len(evt.get("segments", []))
                 elif evt["type"] == "done":
                     got_done = True
                     break
@@ -313,20 +298,17 @@ try:
                     errors.append(evt.get("message", "unknown"))
             except Exception:
                 pass
-            if time.time() - t0 > STREAM_TIMEOUT:
-                fail("Promote stream 5K", f"hard timeout {STREAM_TIMEOUT}s — got {chunks_received}/{total_chunks} chunks")
-                break
         elapsed = round(time.time() - t0, 1)
         if errors:
-            fail("Promote stream 5K", f"errors: {errors}")
+            fail("Promote stream 1K", f"errors: {errors}")
         elif not got_done:
-            fail("Promote stream 5K", f"no done event — {chunks_received}/{total_chunks} chunks, {segments_total} segs")
+            fail("Promote stream 1K", f"no done event — got {chunks_received}/{total_chunks} chunks, {segments_total} segs")
         elif chunks_received < total_chunks:
-            fail("Promote stream 5K", f"incomplete: {chunks_received}/{total_chunks} chunks, {segments_total} segs in {elapsed}s")
+            fail("Promote stream 1K", f"incomplete: {chunks_received}/{total_chunks} chunks, {segments_total} segs in {elapsed}s")
         else:
-            ok("Promote stream 5K", f"{chunks_received}/{total_chunks} chunks, {segments_total} segs in {elapsed}s")
-except Exception as e:
-    fail("Promote stream 5K", str(e))
+            ok("Promote stream 1K", f"{chunks_received}/{total_chunks} chunks, {segments_total} segs in {elapsed}s")
+  except Exception as e:
+    fail("Promote stream 1K", str(e))
 
 # ── 5. COVER SUGGESTIONS ────────────────────────────────────────────────────
 section("5. COVER SUGGESTIONS")
@@ -347,9 +329,43 @@ try:
 except Exception as e:
     fail("Cover suggestions", str(e))
 
+
+# ── 6. SCOUT TAB ────────────────────────────────────────────────────────────
+section("6. SCOUT TAB")
+
+try:
+    t0 = time.time()
+    r = requests.post(BASE + "/api/scout/harvest",
+        json={"sources": [], "seeds": ["feeling stuck"]},
+        timeout=90)
+    elapsed = round(time.time() - t0, 1)
+    if r.status_code == 200:
+        d = r.json()
+        sc = d.get("suggestion_count", 0)
+        wc = d.get("word_count", 0)
+        if sc > 0:
+            ok("Scout harvest (seeds only)", f"{sc} suggestions, {wc} words in {elapsed}s")
+        else:
+            fail("Scout harvest (seeds only)", "200 but zero suggestions")
+    else:
+        # NOTE: suggestion engines may block datacenter IPs. A 502 here with
+        # engine errors is the server telling the truth about its network.
+        fail("Scout harvest (seeds only)", f"HTTP {r.status_code}: {r.text[:200]}")
+except Exception as e:
+    fail("Scout harvest (seeds only)", str(e))
+
+try:
+    r = requests.post(BASE + "/api/scout/harvest", json={"sources": [], "seeds": []}, timeout=15)
+    if r.status_code == 422:
+        ok("Scout empty-input rejection", "422 as designed")
+    else:
+        fail("Scout empty-input rejection", f"expected 422, got {r.status_code}")
+except Exception as e:
+    fail("Scout empty-input rejection", str(e))
+
 # ── SUMMARY ─────────────────────────────────────────────────────────────────
 print(f"\n{'='*50}")
-print(f"  RESULTS:  {PASS} passed  {FAIL} failed")
+print(f"  RESULTS:  {PASS} passed  {FAIL} failed" + ("" if AI_TESTS else "  (AI tests skipped — use --ai)"))
 print('='*50)
 if FAIL > 0:
     print("\nFAILED:")

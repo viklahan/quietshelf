@@ -35,6 +35,7 @@ _live.log
 # committing them would duplicate several MB into a public repo. The .dc.html
 # mockups and drop-in files in those folders ARE committed.
 /Quiet Shelf Design Handoff/design_handoff_quiet_shelf/*/*.zip
+/Quiet Shelf Design Handoff.zip
 
 # Local screenshots / captures (kept out of the repo, not deleted)
 /storymap-live.png
