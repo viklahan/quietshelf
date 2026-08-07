@@ -132,6 +132,45 @@ function Promote() {
   const lastEventRef = React.useRef(0);       // when the last chunk landed
   const chunkEstRef = React.useRef(35);       // seconds per chunk-wave (adapts)
 
+  // Live reading lines: real fragments of the writer's own text, paired with
+  // verbs that describe what the mapper genuinely does (find names, weigh
+  // phrases against footage, mark beats, read moods). Nothing invented.
+  const phrasePoolRef = React.useRef([]);
+  React.useEffect(function () {
+    if (phase !== 'becoming') return;
+    const words = (text || '').split(/\s+/).filter(Boolean);
+    const pool = [];
+    for (let i = 0; i + 6 < words.length && pool.length < 40; i += 17) {
+      const frag = words.slice(i, i + Math.min(7, 4 + (i % 4))).join(' ')
+        .replace(/[\u201C\u201D"]+/g, '').replace(/[.,;:!?]+$/, '');
+      if (frag.length > 12) pool.push(frag);
+    }
+    phrasePoolRef.current = pool.length ? pool : ['your piece'];
+  }, [phase, text]);
+
+  function busyReadingLine() {
+    const pool = phrasePoolRef.current;
+    if (!pool.length) return '';
+    const elapsed = Math.max(0, (Date.now() - runStartRef.current) / 1000);
+    const step = Math.floor(elapsed / 4);  // rotate every 4s
+    const frag = pool[step % pool.length];
+    const verbs = [
+      'Listening for names near \u201C', 
+      'Weighing \u201C',
+      'Marking a beat around \u201C',
+      'Reading \u201C',
+      'Searching moods for \u201C',
+    ];
+    const tails = ['\u201D', '\u201D against stock footage', '\u201D', '\u201D\u2026', '\u201D'];
+    const v = step % verbs.length;
+    return verbs[v] + frag + tails[v];
+  }
+
+  function elapsedLabel() {
+    const s = Math.max(0, Math.floor((Date.now() - runStartRef.current) / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
   const mappingActive = totalChunks > 0 && doneChunks < totalChunks;
   React.useEffect(function() {
     if (!(phase === 'becoming' || mappingActive)) return;
@@ -440,10 +479,13 @@ function Promote() {
             ></div>
           </div>
           <p className="qs-mapprogress__pct">
-            {totalChunks > 0 ? pct + '%' : 'Getting started\u2026'}
+            {(totalChunks > 0 ? pct + '%' : 'Getting started\u2026') + ' \u00b7 ' + elapsedLabel()}
           </p>
-          <p className="qs-quiethint" style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
-            Free models can be slow — hang tight, your words are being mapped.
+          <p className="qs-quiethint" style={{ marginTop: 'var(--space-4)', textAlign: 'center', minHeight: '1.4em' }}>
+            {busyReadingLine()}
+          </p>
+          <p className="qs-quiethint" style={{ marginTop: 'var(--space-2)', textAlign: 'center', opacity: 0.7 }}>
+            Free models can be slow — your words are being mapped, not lost.
           </p>
         </div>
       </div>
