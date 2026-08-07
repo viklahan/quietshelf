@@ -40,3 +40,4 @@ _live.log
 # Local screenshots / captures (kept out of the repo, not deleted)
 /storymap-live.png
 /frontend/data/
+/tests/hetznerlogs/
