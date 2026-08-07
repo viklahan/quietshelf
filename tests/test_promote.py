@@ -127,6 +127,30 @@ def test_persistent_upstream_error_is_502(client, valid_script, monkeypatch):
     assert response.status_code == 502
 
 
+def test_stream_emits_heartbeats_during_slow_chunks(monkeypatch, client):
+    """nginx kills silent SSE at proxy_read_timeout; slow provider waits must
+    produce ': hb' comment lines so the pipe never goes silent. Regression for
+    ERR_INCOMPLETE_CHUNKED_ENCODING seen in production 2026-08-07."""
+    import time as _time
+    from app.services.promote import router as pr
+    from app.services.promote import mapper
+
+    monkeypatch.setattr(pr, "SSE_HEARTBEAT_SECONDS", 0.05)
+    monkeypatch.setattr(pr, "SSE_WAIT_TIMEOUT", 5.0)
+
+    def slow_generate(system, user, model):
+        _time.sleep(0.3)  # several heartbeat intervals of silence
+        return _valid_chunk_result()
+    monkeypatch.setattr(mapper, "generate_json", slow_generate)
+
+    with client.stream("POST", "/api/promote/stream",
+                       json={"script": "A quiet morning. " * 40}) as r:
+        assert r.status_code == 200
+        raw = "".join(chunk for chunk in r.iter_text())
+    assert ": hb" in raw, "no heartbeat comments during slow chunk waits"
+    assert '"type": "done"' in raw or '"type":"done"' in raw.replace(" ", ""), "stream did not complete"
+
+
 def test_empty_script_rejected(client):
     response = client.post("/api/promote", json={"script": ""})
     assert response.status_code == 422

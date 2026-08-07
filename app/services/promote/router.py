@@ -34,6 +34,9 @@ from app.services.storymap.grounding import MapParseError, cast_sheet, parse_map
 
 logger = logging.getLogger("quietshelf.promote")
 
+SSE_HEARTBEAT_SECONDS = 10.0   # emit ": hb" comment when a chunk wait exceeds this
+SSE_WAIT_TIMEOUT = 180.0       # overall per-wait ceiling before an honest error
+
 router = APIRouter(prefix="/api", tags=["promote"])
 
 
@@ -194,11 +197,23 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
         yield f"data: {json.dumps({'type': 'meta', 'total_chunks': total})}\n\n"
 
         while received < total:
-            try:
-                idx, result, exc = result_queue.get(timeout=180)
-            except queue.Empty:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Timed out waiting for chunks.'})}\n\n"
-                return
+            # Poll in short slices, emitting SSE heartbeat comments during long
+            # provider waits. Pacing + retry ladders can silence the stream for
+            # minutes, and nginx kills a silent upstream at proxy_read_timeout
+            # (default 60s) — surfacing as ERR_INCOMPLETE_CHUNKED_ENCODING in
+            # the browser. Comment lines (": ...") are ignored by EventSource
+            # and by our own parser, but they keep the pipe audibly alive.
+            waited = 0.0
+            while True:
+                try:
+                    idx, result, exc = result_queue.get(timeout=SSE_HEARTBEAT_SECONDS)
+                    break
+                except queue.Empty:
+                    waited += SSE_HEARTBEAT_SECONDS
+                    if waited >= SSE_WAIT_TIMEOUT:
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Timed out waiting for chunks.'})}\n\n"
+                        return
+                    yield ": hb\n\n"
 
             received += 1
 
