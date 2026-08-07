@@ -276,3 +276,135 @@ def test_json_mode_false_omits_gemini_mime(monkeypatch):
     monkeypatch.setattr(gemini_mod.genai, "Client", _CapClient)
     GeminiProvider().generate(SYSTEM, USER, json_mode=False)
     assert captured["config"].response_mime_type is None
+
+
+# ── Waterfall: a HANGING provider must not starve every later call ────────────
+# Regression for the 2026-08-07 promote outage. OpenRouter sat first in
+# WATERFALL_ORDER and ran to LLM_TIMEOUT_SECONDS (120s) on every call instead of
+# failing fast. ProviderTimeout was classified transient, so the dead-provider
+# cooldown never engaged and EVERY chunk re-paid the full 120s. With
+# SSE_WAIT_TIMEOUT=180 for the whole promote stream, three chunks starved and the
+# writer saw "Timed out waiting for chunks" after ~3 minutes.
+
+def _waterfall_with(monkeypatch, order, builders):
+    """Point the waterfall at fake providers and reset its cooldown state."""
+    from app.providers import waterfall as wf
+
+    wf._dead.clear()
+    wf._timeout_streak.clear()
+    monkeypatch.setattr(wf.config, "waterfall_order", lambda: list(order))
+    monkeypatch.setattr(wf, "_build_provider", lambda name: builders.get(name))
+    return wf
+
+
+class _AlwaysTimesOut:
+    """Stands in for OpenRouter-on-a-free-model: never errors, just burns time."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, system_prompt, user_content, json_mode=True):
+        from app.providers.base import ProviderTimeout
+
+        self.calls += 1
+        raise ProviderTimeout("Request timed out after 120s")
+
+
+class _AlwaysWorks:
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, system_prompt, user_content, json_mode=True):
+        self.calls += 1
+        return "{}"
+
+
+def test_repeated_timeouts_cool_a_provider_down(monkeypatch):
+    """After the streak limit, a reliably-timing-out provider is skipped
+    entirely — later calls must not pay its timeout again."""
+    from app.providers.waterfall import (
+        TIMEOUT_STREAK_LIMIT, WaterfallProvider,
+    )
+
+    slow, fast = _AlwaysTimesOut(), _AlwaysWorks()
+    _waterfall_with(monkeypatch, ["slowpoke", "goodguy"],
+                    {"slowpoke": slow, "goodguy": fast})
+
+    w = WaterfallProvider()
+    for _ in range(TIMEOUT_STREAK_LIMIT + 3):
+        assert w.generate(SYSTEM, USER) == "{}"
+
+    # It may only be tried up to the streak limit; after that it's cooled down.
+    assert slow.calls == TIMEOUT_STREAK_LIMIT, (
+        f"timing-out provider was called {slow.calls}x; "
+        f"expected it to stop at {TIMEOUT_STREAK_LIMIT}"
+    )
+    assert fast.calls == TIMEOUT_STREAK_LIMIT + 3
+
+
+def test_a_success_resets_the_timeout_streak(monkeypatch):
+    """One-off timeouts must NOT sideline a healthy provider — the streak only
+    counts CONSECUTIVE timeouts."""
+    from app.providers.base import ProviderTimeout
+    from app.providers.waterfall import WaterfallProvider
+
+    class _FlakyThenFine:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, system_prompt, user_content, json_mode=True):
+            self.calls += 1
+            if self.calls % 2 == 1:      # timeout, ok, timeout, ok ...
+                raise ProviderTimeout("Request timed out after 120s")
+            return '{"ok": true}'
+
+    flaky, fast = _FlakyThenFine(), _AlwaysWorks()
+    _waterfall_with(monkeypatch, ["flaky", "goodguy"],
+                    {"flaky": flaky, "goodguy": fast})
+
+    w = WaterfallProvider()
+    for _ in range(6):
+        w.generate(SYSTEM, USER)
+
+    # Alternating timeouts never reach the streak limit, so it is never cooled
+    # down and keeps serving every other call itself.
+    assert flaky.calls == 6, f"healthy-but-flaky provider was sidelined after {flaky.calls} calls"
+
+
+def test_a_trickling_provider_is_cut_off_by_the_wall_clock_deadline(monkeypatch):
+    """THE 2026-08-07 PROMOTE OUTAGE, exactly.
+
+    OpenRouter returned 200 headers in ~5s then dribbled the response body for
+    8+ minutes. httpx's `read` timeout is PER SOCKET READ, not a total deadline,
+    so a peer that sends any byte before it expires resets it forever — the
+    120s LLM_TIMEOUT_SECONDS never fired, no ProviderTimeout was ever raised,
+    the waterfall never fell through, and the promote stream starved.
+
+    A leg must not be able to outlive the whole stream's budget."""
+    import time as _time
+
+    from app.providers.base import ProviderTimeout
+    from app.providers.waterfall import PROVIDER_DEADLINE_SECONDS, WaterfallProvider
+
+    class _Trickler:
+        """Never raises. Never returns in time. Exactly like a slow-loris body."""
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, system_prompt, user_content, json_mode=True):
+            self.calls += 1
+            _time.sleep(PROVIDER_DEADLINE_SECONDS + 30)
+            return "{}"
+
+    slow, fast = _Trickler(), _AlwaysWorks()
+    _waterfall_with(monkeypatch, ["trickler", "goodguy"],
+                    {"trickler": slow, "goodguy": fast})
+    monkeypatch.setattr("app.providers.waterfall.PROVIDER_DEADLINE_SECONDS", 1.0)
+
+    t0 = _time.time()
+    assert WaterfallProvider().generate(SYSTEM, USER) == "{}"
+    elapsed = _time.time() - t0
+
+    # It must give up on the trickler and serve from the healthy leg promptly.
+    assert elapsed < 10, f"waterfall waited {elapsed:.1f}s on a trickling leg"
+    assert fast.calls == 1

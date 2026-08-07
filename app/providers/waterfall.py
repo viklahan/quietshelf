@@ -11,6 +11,7 @@ Smart routing: Cerebras free tier caps context at 8,192 tokens. The
 waterfall skips Cerebras for large calls automatically.
 """
 from __future__ import annotations
+import concurrent.futures
 import logging
 import time
 from app import config
@@ -74,12 +75,51 @@ def _is_permanent_failure(msg: str) -> bool:
 # discovery cost; everyone after skips the corpse in zero seconds.
 COOLDOWN_SECONDS = 600.0
 
+# A provider that HANGS is worse than one that's broken. A dead key 401s in
+# 200ms and the waterfall moves on; a provider that runs to LLM_TIMEOUT_SECONDS
+# (120s) burns two-thirds of the promote stream's 180s budget before the healthy
+# legs downstream get a turn. Timeouts are transient by nature — one is a blip,
+# so a single one must NOT sideline a good provider — but a provider timing out
+# CONSECUTIVELY is reliably slow, and re-paying 120s per chunk is what starved
+# the stream on 2026-08-07 (OpenRouter, first in order, on a :free model).
+# Streak counts consecutive timeouts; any success resets it.
+TIMEOUT_STREAK_LIMIT = 2
+TIMEOUT_COOLDOWN_SECONDS = 300.0  # shorter than a dead key: slowness does heal
+
+# ── Wall-clock deadline per leg ───────────────────────────────────────────────
+# An HTTP client timeout is NOT a deadline. httpx (and the OpenAI SDK on top of
+# it) applies `read` PER SOCKET READ, so a provider that returns 200 headers
+# immediately and then dribbles the body a few bytes at a time resets the timer
+# forever and hangs indefinitely — no exception, no fallthrough.
+#
+# That is exactly what took Promote down on 2026-08-07: OpenRouter answered
+# headers in ~5s then trickled for 8+ minutes while LLM_TIMEOUT_SECONDS=120 sat
+# there never firing. The promote stream gives up at 180s (SSE_WAIT_TIMEOUT), so
+# the writer saw "Timed out waiting for chunks" and lost the whole run.
+#
+# One leg must never be able to outlive the stream that is waiting on it. This
+# is a true wall-clock budget: when it expires we stop waiting and move on. The
+# abandoned worker is a daemon and dies with the process; after
+# TIMEOUT_STREAK_LIMIT of these the leg is cooled down and stops being called
+# at all, so the leak is bounded.
+PROVIDER_DEADLINE_SECONDS = 45.0
+
 _dead: dict[str, tuple[float, str]] = {}  # name -> (until_ts, reason)
+_timeout_streak: dict[str, int] = {}      # name -> consecutive timeouts
 
 
-def _mark_dead(name: str, reason: str) -> None:
-    _dead[name] = (time.time() + COOLDOWN_SECONDS, reason[:200])
-    logger.warning("waterfall: %s marked dead for %ds (%s)", name, int(COOLDOWN_SECONDS), reason[:200])
+def _mark_dead(name: str, reason: str, cooldown: float = COOLDOWN_SECONDS) -> None:
+    _dead[name] = (time.time() + cooldown, reason[:200])
+    logger.warning("waterfall: %s marked dead for %ds (%s)", name, int(cooldown), reason[:200])
+
+
+def _record_timeout(name: str, reason: str) -> None:
+    """Count a consecutive timeout; cool the provider down once it's clearly
+    not a blip. Keeps a hanging leg from re-costing every later call."""
+    streak = _timeout_streak.get(name, 0) + 1
+    _timeout_streak[name] = streak
+    if streak >= TIMEOUT_STREAK_LIMIT:
+        _mark_dead(name, f"{streak} consecutive timeouts: {reason}", TIMEOUT_COOLDOWN_SECONDS)
 
 
 def _dead_reason(name: str) -> str | None:
@@ -95,6 +135,33 @@ def _dead_reason(name: str) -> str | None:
 
 def _revive(name: str) -> None:
     _dead.pop(name, None)
+    _timeout_streak.pop(name, None)  # a success proves it's healthy again
+
+
+# Daemon threads: an abandoned trickle-read must never hold the process open.
+_deadline_pool = concurrent.futures.ThreadPoolExecutor(
+    max_workers=8, thread_name_prefix="wf-deadline"
+)
+
+
+def _generate_with_deadline(provider, system_prompt: str, user_content: str,
+                            json_mode: bool) -> str:
+    """Run one provider call under a wall-clock budget.
+
+    Raises ProviderTimeout when the budget expires, converting a silent hang
+    into the honest failure the waterfall already knows how to fall through.
+    """
+    future = _deadline_pool.submit(
+        provider.generate, system_prompt, user_content, json_mode
+    )
+    try:
+        return future.result(timeout=PROVIDER_DEADLINE_SECONDS)
+    except concurrent.futures.TimeoutError as exc:
+        future.cancel()  # best-effort; a thread already in a socket read won't stop
+        raise ProviderTimeout(
+            f"exceeded {PROVIDER_DEADLINE_SECONDS:.0f}s wall-clock deadline "
+            f"(response never completed)"
+        ) from exc
 
 
 class WaterfallProvider(Provider):
@@ -133,12 +200,18 @@ class WaterfallProvider(Provider):
                 continue
             try:
                 logger.info("waterfall: trying %s", name)
-                result = p.generate(system_prompt, user_content, json_mode)
+                result = _generate_with_deadline(p, system_prompt, user_content, json_mode)
                 _revive(name)
                 if errors:
                     logger.warning("waterfall: fell through to %s after: %s", name, "; ".join(errors))
                 return result
-            except (ProviderRateLimited, ProviderTimeout) as e:
+            except ProviderTimeout as e:
+                msg = f"{name}: timed out ({e})"
+                logger.warning("waterfall: %s — trying next", msg)
+                errors.append(msg)
+                permanent_flags.append(False)  # slowness is never permanent
+                _record_timeout(name, str(e))
+            except ProviderRateLimited as e:
                 msg = f"{name}: rate-limited ({e})"
                 logger.warning("waterfall: %s — trying next", msg)
                 errors.append(msg)
