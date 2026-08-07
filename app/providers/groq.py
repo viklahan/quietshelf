@@ -73,8 +73,25 @@ class GroqProvider(Provider):
                 logger.warning("groq: model %s not found, trying next", model)
                 last_exc = exc
                 continue
+            except groq_sdk.BadRequestError as exc:
+                # Groq retires models with 400 model_decommissioned, NOT 404 -
+                # the ladder must hear that too, or it never engages (August
+                # 2026: every call 400'd on a dead primary while four healthy
+                # fallbacks sat unused).
+                msg = str(exc)
+                dead_model = any(k in msg.lower() for k in (
+                    "decommission", "deprecat", "model_not_found",
+                    "does not exist", "invalid model", "no longer supported",
+                ))
+                if dead_model:
+                    logger.warning("groq: model %s rejected (%.200s), trying next", model, msg)
+                    last_exc = exc
+                    continue
+                raise ProviderError(f"Groq API error: {msg[:300]}") from exc
             except groq_sdk.APIError as exc:
-                raise ProviderError(f"Groq API error: {type(exc).__name__}") from exc
+                # Always carry the provider's own words - a class name is a
+                # symptom, the message is the diagnosis.
+                raise ProviderError(f"Groq API error: {type(exc).__name__}: {str(exc)[:300]}") from exc
 
         raise ProviderError(
             f"No working Groq model found. Tried: {models_to_try}. Last: {last_exc}"
