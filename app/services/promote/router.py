@@ -196,34 +196,13 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
 
         yield f"data: {json.dumps({'type': 'meta', 'total_chunks': total})}\n\n"
 
-        while received < total:
-            # Poll in short slices, emitting SSE heartbeat comments during long
-            # provider waits. Pacing + retry ladders can silence the stream for
-            # minutes, and nginx kills a silent upstream at proxy_read_timeout
-            # (default 60s) — surfacing as ERR_INCOMPLETE_CHUNKED_ENCODING in
-            # the browser. Comment lines (": ...") are ignored by EventSource
-            # and by our own parser, but they keep the pipe audibly alive.
-            waited = 0.0
-            while True:
-                try:
-                    idx, result, exc = result_queue.get(timeout=SSE_HEARTBEAT_SECONDS)
-                    break
-                except queue.Empty:
-                    waited += SSE_HEARTBEAT_SECONDS
-                    if waited >= SSE_WAIT_TIMEOUT:
-                        yield f"data: {json.dumps({'type': 'error', 'message': 'Timed out waiting for chunks.'})}\n\n"
-                        return
-                    yield ": hb\n\n"
-
-            received += 1
-
-            if exc is not None:
-                logger.warning("promote_stream chunk %d failed: %s", idx, exc)
-                result = _fallback_chunk(chunks[idx])
-
+        def render(idx: int, result) -> str:
+            """Turn one mapped chunk into its SSE line. Shared by the normal
+            arrival path and the stall-recovery path below, so a recovered
+            chunk is indistinguishable in shape from any other."""
+            nonlocal title
             if not title and result.video_title_suggestion.strip():
                 title = result.video_title_suggestion.strip()
-
             cumulative = chunk_offsets[idx]
             segments_out = []
             for draft in result.segments:
@@ -248,9 +227,61 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                 )
                 segments_out.append(seg.model_dump())
                 cumulative += duration
+            return "data: " + json.dumps({
+                'type': 'chunk', 'chunk_index': idx, 'segments': segments_out,
+                'chunks_done': received, 'total_chunks': total,
+            }) + "\n\n"
+
+        seen: set[int] = set()
+        while received < total:
+            # Poll in short slices, emitting SSE heartbeat comments during long
+            # provider waits. Pacing + retry ladders can silence the stream for
+            # minutes, and nginx kills a silent upstream at proxy_read_timeout
+            # (default 60s) — surfacing as ERR_INCOMPLETE_CHUNKED_ENCODING in
+            # the browser. Comment lines (": ...") are ignored by EventSource
+            # and by our own parser, but they keep the pipe audibly alive.
+            waited = 0.0
+            stalled = False
+            while True:
+                try:
+                    idx, result, exc = result_queue.get(timeout=SSE_HEARTBEAT_SECONDS)
+                    break
+                except queue.Empty:
+                    waited += SSE_HEARTBEAT_SECONDS
+                    if waited >= SSE_WAIT_TIMEOUT:
+                        stalled = True
+                        break
+                    yield ": hb\n\n"
+
+            if stalled:
+                # A chunk stopped answering. Until 2026-08-20 this did a bare
+                # `return`, which threw away EVERY remaining chunk - including
+                # ones already mapped or certain to succeed. A writer on the
+                # live site got a third of their script back and no explanation.
+                # The writer's script is the contract: a stall costs THAT chunk
+                # (keyword fallback, flagged needs_remap so the UI shows it and
+                # the remap button can fix it), never the remainder.
+                outstanding = [i for i in range(total) if i not in seen]
+                logger.warning(
+                    "promote_stream stalled after %d/%d chunks - "
+                    "falling back %d chunk(s) rather than discarding them",
+                    received, total, len(outstanding),
+                )
+                for missing in outstanding:
+                    seen.add(missing)
+                    received += 1
+                    yield render(missing, _fallback_chunk(chunks[missing]))
+                break
+
+            seen.add(idx)
+            received += 1
+
+            if exc is not None:
+                logger.warning("promote_stream chunk %d failed: %s", idx, exc)
+                result = _fallback_chunk(chunks[idx])
 
             # Emit immediately in arrival order — fast and progressive
-            yield f"data: {json.dumps({'type': 'chunk', 'chunk_index': idx, 'segments': segments_out, 'chunks_done': received, 'total_chunks': total})}\n\n"
+            yield render(idx, result)
 
         yield f"data: {json.dumps({'type': 'done', 'title': detected_title or title or 'Your video', 'estimated_runtime_seconds': chunk_offsets[-1]})}\n\n"
 

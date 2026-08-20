@@ -289,3 +289,63 @@ def test_chunk_target_is_small_enough_for_reliable_json():
     assert mapper.CHUNK_TARGET_WORDS <= 200, (
         f"chunk target {mapper.CHUNK_TARGET_WORDS} is in the coin-flip range"
     )
+
+
+def test_one_stalled_chunk_does_not_discard_the_rest_of_the_script(monkeypatch, client):
+    """2026-08-20 prod: a writer got 1/3 of their script mapped. SSE_WAIT_TIMEOUT
+    is a PER-WAIT ceiling and the generator `return`s when it fires - so one slow
+    chunk threw away every chunk after it, including ones that would have
+    succeeded. The writer's script is the contract: a stalled chunk costs THAT
+    chunk (keyword fallback, flagged needs_remap), never the remainder."""
+    import threading
+    from app.services.promote import mapper
+    from app.services.promote import router as pr
+
+    monkeypatch.setattr(pr, "SSE_HEARTBEAT_SECONDS", 0.05)
+    monkeypatch.setattr(pr, "SSE_WAIT_TIMEOUT", 1.0)
+
+    calls = {"n": 0}
+    lock = threading.Lock()
+    # Released in `finally` so stalled worker threads exit WITH the test. Left
+    # running, they outlive monkeypatch teardown, fall through to the real
+    # provider, and fire live API calls on every test run.
+    release = threading.Event()
+
+    def first_fast_rest_stall(system, user, model):
+        with lock:
+            calls["n"] += 1
+            n = calls["n"]
+        if n == 1:
+            return _valid_chunk_result()
+        # Event.wait, not time.sleep: mapper.time IS the global time module, so
+        # patching its sleep elsewhere would silently neuter this stall.
+        release.wait(5)
+        return _valid_chunk_result()
+
+    monkeypatch.setattr(mapper, "generate_json", first_fast_rest_stall)
+
+    script = "A quiet morning by the still water. " * 120
+    try:
+        with client.stream("POST", "/api/promote/stream", json={"script": script}) as r:
+            assert r.status_code == 200
+            raw = "".join(part for part in r.iter_text())
+    finally:
+        release.set()
+
+    events = []
+    for line in raw.splitlines():
+        if line.startswith("data:"):
+            payload = line[5:].strip()
+            if payload and payload != "[DONE]":
+                try:
+                    events.append(json.loads(payload))
+                except json.JSONDecodeError:
+                    pass
+    total = next(e["total_chunks"] for e in events if e.get("type") == "meta")
+    delivered = [e for e in events if e.get("type") == "chunk"]
+
+    assert total > 1, "test needs a multi-chunk script"
+    assert len(delivered) == total, (
+        f"only {len(delivered)}/{total} chunks reached the writer - the rest were discarded"
+    )
+    assert any(e.get("type") == "done" for e in events), "stream ended without 'done'"
