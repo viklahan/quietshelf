@@ -1,6 +1,6 @@
 # Quiet Shelf — STATUS
 
-_Continuity doc. Last updated 2026-08-20. Read this first on any return._
+_Continuity doc. Last updated 2026-08-20 (late). Read this first on any return._
 
 ## Where it stands: **LIVE IN PRODUCTION**
 
@@ -58,6 +58,89 @@ by design and doesn't need any.
 
 Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
 (1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
+
+## Shipped 2026-08-20 — why it worked for me and broke for them
+
+**The pattern that mattered:** the link was shared twice after testing, and both
+times it failed for the people who tried it. Not intermittently — reliably, for
+them, never for the author. That asymmetry was the whole diagnosis.
+
+**Root cause: the author writes scripts with line breaks; strangers paste
+paragraphs.** `_beats()` splits on newlines only, so an essay pasted out of a
+Google Doc arrives as ONE beat — and a lone beat gives the group loop nothing to
+split on. A 5,000-word story went to the model in a single call. Same app, same
+keys, same server, completely different code path. The author was never testing
+what the users were doing.
+
+Four faults chained off that one input shape:
+
+1. **Prose was never chunked.** Oversized beats now split on sentences —
+   `_split_sentences()` was still sitting in the file marked "legacy," from
+   before `d8f7021` made chunking line-break-driven. Writers who DID break lines
+   never reach that branch and keep their pacing exactly as written.
+
+2. **One bad paste benched Groq for 600s, for every user.** The oversized call
+   returned 400 `json_validate_failed`; the ladder treats that as a dead model,
+   walked three more rungs, and concluded "No working Groq model found" — a
+   phrase `_is_permanent_failure()` matches, so the waterfall cooled the whole
+   provider down. `json_validate_failed` is a fact about THAT REQUEST, not the
+   model: the same model serves a smaller chunk fine. Now tracked separately and
+   worded as the retryable bad request it is.
+
+3. **Valid JSON was being discarded.** `openai/gpt-oss-120b` is a REASONING
+   model — it returns a complete object and then keeps talking about its
+   choices. `_isolate_object` handed the whole string to `json.loads`, which
+   said "Extra data" and binned a good mapping, which then triggered fault 2.
+   Now uses `json.JSONDecoder().raw_decode()`: parse the first complete object,
+   ignore the essay that follows.
+
+4. **Chunk size was the reliability lever nobody was holding.** Measured against
+   `gpt-oss-120b`, same essay, same prompt, size the only variable:
+
+   | chunk target | valid JSON |
+   |---|---|
+   | 150 words | 8/8 (100%) |
+   | 250 words | 4/6 (67%) |
+   | 400 words | 2/4 (50%) |
+
+   A 400-word chunk asks for ~12 segments x 6 search terms = 70+ constrained
+   fields in one response; the longer it generates, the likelier Groq's
+   validator rejects the lot. `223fcb0` raised this 200 -> 400 to "halve API
+   calls" and quietly made every mapping call a coin flip. Back to 150, tunable
+   with `PROMOTE_CHUNK_WORDS`. A failed chunk costs a retry, a keyword fallback,
+   or the whole run — far more expensive than an extra call.
+
+**Coverage is now enforced, not requested.** `RULES: 1. Cover EVERY line` was an
+instruction the model was free to ignore, and it did — a 549-word essay came
+back with 97 words missing from the middle and nothing on screen admitting it.
+`_repair_coverage()` reinstates any skipped run in its original position as a
+keyword-mapped segment flagged `needs_remap`, so the UI shows it and the remap
+button fixes it. The writer's word count is the contract.
+
+**Verified on the failing case** — the essay pasted as ONE paragraph:
+
+| | before | after |
+|---|---|---|
+| chunks | 1 | 4 |
+| coverage | 82% | **100%** |
+| duplicate passages | yes | **0 exact, 0 near** |
+| needs_remap | — | 0/18 |
+| moods | 1 | 7 distinct |
+
+198 tests pass, 11 new. Also dropped `moonshotai/kimi-k2-instruct` (404 on every
+call; its 404 kept becoming the "Last:" error in the leg's verdict, so the log
+blamed a model nobody uses for a failure the primary caused).
+
+**Still true, and not a code problem:** that run took 103s for 549 words against
+a 180s SSE budget. Free-tier Groq caps at 8,000 tokens/MINUTE — roughly two
+chunks a minute for all users combined — so a long piece cannot finish in time
+no matter how good the code is. Dropping `openrouter` (flat 45s timeout when
+reached) and `cerebras` (402 on every call) from `WATERFALL_ORDER` reclaims real
+wall-clock. Beyond that it is one paid leg or accepted limits; there is no third
+option and no clever code that changes the arithmetic.
+
+**Test what strangers do, not what you do.** Every fault above was invisible to
+the author's own usage. The e2e suite now pastes prose as one paragraph.
 
 ## Shipped 2026-08-20 — the dead-key outage
 
