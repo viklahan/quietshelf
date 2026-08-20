@@ -349,3 +349,69 @@ def test_one_stalled_chunk_does_not_discard_the_rest_of_the_script(monkeypatch, 
         f"only {len(delivered)}/{total} chunks reached the writer - the rest were discarded"
     )
     assert any(e.get("type") == "done" for e in events), "stream ended without 'done'"
+
+
+def test_rate_limited_chunk_waits_for_a_window_instead_of_degrading(monkeypatch, client):
+    """Groq's free tier is 8,000 tokens/MINUTE and one chunk is ~3,000, so a
+    burst throttles BY DESIGN. The old backoff was 3s then 6s - both land in
+    the same dead window, burn all three attempts, and hand the writer keyword
+    garbage for a chunk that only needed to wait. A rate limit is a queue, not
+    a failure. Someone's original writing must never be degraded because we
+    were impatient."""
+    from app.providers import ProviderRateLimited
+    from app.services.promote import mapper
+    from app.services.promote import router as pr
+
+    monkeypatch.setattr(pr, "SSE_HEARTBEAT_SECONDS", 0.05)
+    # A sentinel value, and ONE sleep patch: pr.time and mapper.time are the
+    # same module object, so patching both means the second silently replaces
+    # the first and the recorder never fires.
+    monkeypatch.setattr(pr, "RATE_LIMIT_WINDOW_SECONDS", 0.123)
+    slept: list[float] = []
+    monkeypatch.setattr(pr.time, "sleep", lambda s: slept.append(s))
+
+    calls = {"n": 0}
+
+    def throttled_then_fine(system, user, model):
+        # Echoes the chunk back so _repair_coverage is a genuine no-op here -
+        # a canned result covering none of the input would be flagged
+        # needs_remap for the right reason and mask what this test measures.
+        from app.services.promote.models import ChunkResult, ChunkSegment
+
+        calls["n"] += 1
+        # 3 failures exhausts _map_chunk's own RATE_LIMIT_RETRIES (2), so the
+        # 4th call only happens if the ROUTER waited for a fresh window rather
+        # than dumping the chunk to keyword fallback. That is what is measured.
+        if calls["n"] <= 3:
+            raise ProviderRateLimited("All Groq models rate-limited")
+        return ChunkResult(video_title_suggestion="t", segments=[
+            ChunkSegment(script_text=user, search_terms=["quiet water dawn",
+                         "still lake morning", "mist over reeds"],
+                         clip_duration_seconds=5, mood="calm")])
+
+    monkeypatch.setattr(mapper, "generate_json", throttled_then_fine)
+
+    with client.stream("POST", "/api/promote/stream",
+                       json={"script": "A quiet morning by the water. " * 20}) as r:
+        raw = "".join(part for part in r.iter_text())
+
+    segs = []
+    for line in raw.splitlines():
+        if line.startswith("data:"):
+            payload = line[5:].strip()
+            if payload and payload != "[DONE]":
+                try:
+                    ev = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("type") == "chunk":
+                    segs.extend(ev["segments"])
+
+    assert segs, "no segments emitted"
+    assert not any(s["needs_remap"] for s in segs), (
+        "a merely THROTTLED chunk was degraded to keyword fallback"
+    )
+    assert 0.123 in slept, (
+        f"router never waited for a fresh rate-limit window (sleeps: {slept})"
+    )
+    assert calls["n"] >= 4, "gave up before retrying past the throttle"

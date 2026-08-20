@@ -15,7 +15,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app import config
 from app.deps import guard
 from app.http_errors import llm_error_to_response
-from app.providers import JSONParseError, ProviderConfigError, ProviderError
+from app.providers import (
+    JSONParseError,
+    ProviderConfigError,
+    ProviderError,
+    ProviderRateLimited,
+)
 from app.services.promote.mapper import (
     CHUNK_TARGET_WORDS,
     SYSTEM_PROMPT,
@@ -36,6 +41,19 @@ logger = logging.getLogger("quietshelf.promote")
 
 SSE_HEARTBEAT_SECONDS = 10.0   # emit ": hb" comment when a chunk wait exceeds this
 SSE_WAIT_TIMEOUT = 180.0       # overall per-wait ceiling before an honest error
+# Groq free tier: 8,000 tokens/MINUTE, one chunk ~3,000. Throttling is the
+# NORM on a multi-chunk script, not an error. These waits are long enough to
+# reach a genuinely fresh window - a 3s backoff just re-hits the dead one.
+RATE_LIMIT_WINDOW_SECONDS = 30.0
+RATE_LIMIT_WAITS = 3            # up to 90s of patience before degrading
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """True for throttling, which heals on its own, as opposed to a fault."""
+    if isinstance(exc, ProviderRateLimited):
+        return True
+    text = str(exc).lower()
+    return "rate limit" in text or "rate-limited" in text or "429" in text
 
 router = APIRouter(prefix="/api", tags=["promote"])
 
@@ -158,20 +176,20 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
 
     def worker(idx: int, chunk: str) -> None:
         with sem:
-            # Try the AI up to 3 times with backoff before giving up. A chunk
-            # that falls to _fallback_chunk becomes keyword garbage (single-word
-            # padded terms, NEUTRAL mood) — visibly worse than the real mapping.
-            # The waterfall (gemini->groq->cerebras) handles provider failures;
-            # this retry handles the whole waterfall being briefly exhausted.
+            # A chunk that falls to _fallback_chunk becomes keyword garbage
+            # (single-word padded terms, NEUTRAL mood) — visibly worse than a
+            # real mapping, and an insult to someone's original writing. It is
+            # the last resort, never the impatient one.
             last_exc = None
-            for attempt in range(3):
+            attempts = 0
+            rate_waits = 0
+            while True:
                 try:
                     result = _try_map_chunk(chunk, system)
                     if result is not None:
                         result_queue.put((idx, result, None))
                         return
-                    # None = parse failure; retry may get valid JSON
-                    last_exc = None
+                    last_exc = None  # None = parse failure; a retry may parse
                 except Exception as exc:  # noqa: BLE001
                     last_exc = exc
                     if getattr(exc, "permanent", False):
@@ -179,8 +197,27 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                         # unpaid / daily quota gone). More retries = more
                         # minutes of the same errors. Fall back NOW.
                         break
-                if attempt < 2:
-                    time.sleep(3.0 * (attempt + 1))  # 3s, 6s backoff
+                    # A RATE LIMIT IS A QUEUE, NOT A FAILURE. Groq's free tier
+                    # allows 8,000 tokens/MINUTE and one chunk is ~3,000, so a
+                    # multi-chunk script throttles by design. The old backoff
+                    # was 3s then 6s — both land in the SAME dead window, burn
+                    # every attempt, and hand the writer keyword garbage for a
+                    # chunk that only needed to wait. Waiting costs seconds;
+                    # degrading costs them their work. Rate-limit waits get
+                    # their own budget and do not consume normal attempts.
+                    if _is_rate_limited(exc) and rate_waits < RATE_LIMIT_WAITS:
+                        rate_waits += 1
+                        logger.info(
+                            "promote_stream chunk %d throttled - waiting %.0fs for a "
+                            "fresh window (wait %d/%d)",
+                            idx, RATE_LIMIT_WINDOW_SECONDS, rate_waits, RATE_LIMIT_WAITS,
+                        )
+                        time.sleep(RATE_LIMIT_WINDOW_SECONDS)
+                        continue
+                attempts += 1
+                if attempts >= 3:
+                    break
+                time.sleep(3.0 * attempts)  # 3s, 6s for non-throttle failures
             # All attempts failed — last resort keyword mapping
             logger.warning("promote_stream chunk %d exhausted retries: %s", idx, last_exc)
             result_queue.put((idx, _fallback_chunk(chunk), None))
