@@ -41,3 +41,46 @@ def test_rate_limiter_blocks_after_limit():
     assert not limiter.allow("1.2.3.4")
     assert limiter.allow("5.6.7.8")
     assert limiter.retry_after_seconds("1.2.3.4") > 0
+
+
+def test_permanent_provider_failure_does_not_promise_a_retry():
+    """When every waterfall leg died a PERMANENT death (dead key, unpaid
+    account, exhausted daily quota), the waterfall sets exc.permanent. Telling
+    the writer "try again in a minute" is then simply false — the cooldown
+    alone is 10 minutes and a dead key never heals on its own. Regression for
+    2026-08-19, where this message sent the owner hunting a dead server while
+    the real fault was an expired Groq key."""
+    from app.http_errors import llm_error_to_response
+    from app.providers import ProviderError
+
+    exc = ProviderError("All waterfall providers failed: groq: 401; cerebras: 402")
+    exc.permanent = True
+
+    response = llm_error_to_response(
+        exc, failure_code="generation_failed", failure_msg="unused"
+    )
+    import json
+
+    body = json.loads(response.body)
+    assert response.status_code == 503
+    assert body["error"] == "upstream_down"
+    assert "minute" not in body["message"].lower()
+
+
+def test_transient_provider_failure_still_says_try_again():
+    """A plain upstream hiccup has no .permanent flag and must keep the
+    original retryable 502 — only the permanent case changes."""
+    from app.http_errors import llm_error_to_response
+    from app.providers import ProviderError
+
+    response = llm_error_to_response(
+        ProviderError("upstream 500"),
+        failure_code="generation_failed",
+        failure_msg="unused",
+    )
+    import json
+
+    body = json.loads(response.body)
+    assert response.status_code == 502
+    assert body["error"] == "upstream_error"
+    assert "minute" in body["message"].lower()

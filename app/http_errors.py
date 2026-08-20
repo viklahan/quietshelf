@@ -39,6 +39,26 @@ def llm_error_to_response(
         return JSONResponse(
             status_code=502, content={"error": failure_code, "message": failure_msg}
         )
+    # Checked BEFORE the specific branches below because it cuts across them:
+    # the waterfall sets .permanent when EVERY leg died a death that does not
+    # heal on its own — dead key (401), unpaid account (402), exhausted DAILY
+    # quota. Both "try again in a minute" messages are simply false there: the
+    # dead-provider cooldown alone is 10 minutes, and a revoked key never
+    # recovers. Worse, they point the reader at their own patience when the
+    # only thing that can fix this is credentials. Say so plainly.
+    if isinstance(exc, ProviderError) and getattr(exc, "permanent", False):
+        logger.error("provider_permanently_down detail=%s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "upstream_down",
+                "message": (
+                    "The AI service is down for everyone right now, not just "
+                    "this piece. Retrying won't clear it - your work is safe, "
+                    "so come back a little later."
+                ),
+            },
+        )
     if isinstance(exc, ProviderRateLimited):
         logger.warning("provider_rate_limited")
         return JSONResponse(
