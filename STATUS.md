@@ -1,6 +1,6 @@
 # Quiet Shelf — STATUS
 
-_Continuity doc. Last updated 2026-08-07. Read this first on any return._
+_Continuity doc. Last updated 2026-08-20. Read this first on any return._
 
 ## Where it stands: **LIVE IN PRODUCTION**
 
@@ -11,17 +11,24 @@ Five services work, are hardened, and are running in production. First real
 user (a writer friend) has been testing since 07-12 and reports he'll "use it
 all the time." Work is paused at a clean stopping point.
 
-**Live risk as of 08-07: provider health, not code.** All four waterfall legs
-were degraded simultaneously — OpenRouter trickling, Gemini 429 (free tier
-20 req/day exhausted), Groq 400 `json_validate_failed`, Cerebras 402 payment
-required. Groq is carrying the app. Worth choosing a dependable leg before the
-next demo rather than discovering this live again.
+**Live risk as of 08-20: provider health, not code — confirmed twice now.**
+Free-tier keys are the single point of failure. On 08-19 the Groq key went
+invalid (401) and Cerebras stayed unpaid (402), which left only Gemini's
+20-req/day tier; one Promote run exhausted it and the whole site returned 502
+on every AI path while nginx, uvicorn, TLS and the deploy were all perfectly
+healthy. Groq is carrying the app again. A paid leg — any paid leg — is the
+difference between "the shelf stands" and another evening like that one.
 
 ## Production environment
 
 Small Linux VPS, Ubuntu, nginx terminating HTTPS (Let's Encrypt, auto-renewing)
 in front of uvicorn on localhost, managed by a systemd unit with
-`Restart=always`. LLM provider: Groq, `llama-3.3-70b-versatile`.
+`Restart=always`. LLM provider: Groq. **Model note:** `llama-3.3-70b-versatile`
+was retired by Groq on 2026-06-17 and no longer exists; the ladder now lands on
+`openai/gpt-oss-120b`. Two lower rungs are also dead as of 08-20 —
+`openai/gpt-oss-20b` and `qwen/qwen3.6-27b` both return 400
+`json_validate_failed` on the Promote schema, and `moonshotai/kimi-k2-instruct`
+is gone from the account entirely.
 
 **Host specifics — IP, paths, unit name, firewall rules — live in
 `DEPLOY.local.md`, which is gitignored.** This repo is public; infrastructure
@@ -51,6 +58,63 @@ by design and doesn't need any.
 
 Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
 (1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
+
+## Shipped 2026-08-20 — the dead-key outage
+
+**Symptom:** "the prod server is dead." It was not. `GET /api/health` returned
+200 with all five services registered, the box pinged, SSH answered, TLS was
+valid, and prod's route table was byte-identical to local HEAD — so code and
+deploy were exonerated in the first two minutes. What was dead was every leg of
+the provider waterfall.
+
+**Root cause 1 — credentials.** Groq's key had gone invalid (401
+`invalid_api_key`) and Cerebras was 402 unpaid, leaving only Gemini's 20
+requests/day. One Promote run (~15 calls) finished it off. After that every AI
+path returned 502.
+
+**The diagnostic that mattered:** `POST /api/blurb` failed in **0.59 seconds**.
+The 08-07 outage produced the identical user-facing message after 8+ minutes.
+Slow-fail means a hang; fast-fail means every leg rejected at the door
+(401/402/429, or an already-`_dead` cooldown skipping for free). Elapsed time
+named the fault class before a single log line was read.
+
+**Root cause 2 — `load_dotenv(override=False)`.** `app/config.py:8` loads the
+env once at import, and python-dotenv does **not** overwrite variables already
+present in the process environment. Two consequences, both of which cost real
+time that night: a `.env` edit does nothing until `systemctl restart`, and any
+systemd `Environment=`/`EnvironmentFile=` entry silently outranks the file
+forever.
+
+**Shipped fix — the app stops lying about retryability.** The waterfall already
+set `exc.permanent` when every leg died a non-healing death (401 / 402 /
+exhausted daily quota) and the Promote retry paths already honoured it
+(`mapper.py:323,331`, `promote/router.py:177`). Only the HTTP layer ignored it,
+so the one place a human actually reads went on offering patience as the cure
+for a dead key. `llm_error_to_response` now checks `.permanent` first — ahead of
+the type dispatch, because a daily-quota exhaustion arrives as
+`ProviderRateLimited` and its 429 "the free AI tier needs a breather" was
+equally untrue. Permanent failures return **503 `upstream_down`** and say the
+outage is service-wide and won't clear on retry; transient failures keep the 502
+and the original wording. The message names no provider; the diagnosis goes to
+the log as `provider_permanently_down`. 187 tests pass, 2 new.
+
+**Waterfall order matters more than it looks.** Local was
+`openrouter,gemini,groq,cerebras`; OpenRouter trickle-reads, so every chunk paid
+the full 45s `PROVIDER_DEADLINE_SECONDS` before reaching a working leg —
+**75.8s per chunk**. Putting Groq first: **4.7s. 16× faster, one variable.**
+Order the waterfall by measured latency and remaining quota, not by history.
+
+**Verified on prod after the fix** (on quality, never on arrival):
+`/api/promote` 200 in 20.9s, 7 segments, `needs_remap 0/7`, 7 distinct moods;
+`/api/promote/stream` 43.8s, 5 segments, `needs_remap 0/5`, 5 distinct moods,
+136s of SSE headroom. Blurb returns three genuinely distinct variants.
+
+**Two traps worth remembering.** `.env.bak` is **not** gitignored (`.gitignore`
+matches `.env` exactly) — `sed -i.bak` on this repo would drop live keys into a
+public working tree; back up outside the repo. And a local Quiet Shelf that
+appears "broken everywhere" may simply not be running: port 8000 is **Pelco
+Validate**, not a stale squatter, and killing it would take down the wrong
+project.
 
 ## Shipped 2026-08-07 (late) — the Promote outage
 
