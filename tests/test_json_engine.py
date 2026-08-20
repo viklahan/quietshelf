@@ -106,3 +106,33 @@ def test_generate_json_succeeds_via_repair_without_retry(monkeypatch):
     result = generate_json("system", "user", _Model)
     assert result == _Model(a=1, b="x")
     assert len(calls["systems"]) == 1  # repaired on the first response
+
+
+# ── Reasoning models append their thinking after the JSON (2026-08-20) ───────
+def test_trailing_chatter_after_valid_json_is_ignored():
+    """openai/gpt-oss-120b is a REASONING model: it returns a complete JSON
+    object and then keeps talking. _isolate_object returned the whole string
+    when it started with '{', so json.loads saw "Extra data: line 1 column 475"
+    and a perfectly good mapping was thrown away - which then walked the Groq
+    ladder into a whole-provider failure. Parse the first complete object and
+    ignore what follows."""
+    from app.providers.json_engine import _extract_json
+
+    raw = '{"video_title_suggestion": "A Quiet Return", "segments": []}\n\nI chose these because the passage is reflective.'
+    assert _extract_json(raw)["video_title_suggestion"] == "A Quiet Return"
+
+
+def test_trailing_chatter_after_fenced_json_is_ignored():
+    from app.providers.json_engine import _extract_json
+
+    raw = 'Here is the mapping:\n```json\n{"ok": true}\n```\nLet me explain my reasoning: the tone is wistful.'
+    assert _extract_json(raw) == {"ok": True}
+
+
+def test_still_raises_when_there_is_no_json_at_all():
+    """Robustness must not become credulity - genuine non-answers still fail."""
+    import pytest
+    from app.providers.json_engine import _extract_json
+
+    with pytest.raises(ValueError):
+        _extract_json("I'm sorry, I can't map this passage.")

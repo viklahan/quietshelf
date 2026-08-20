@@ -27,7 +27,10 @@ DEFAULT_GROQ_FALLBACKS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
     "qwen/qwen3.6-27b",
-    "moonshotai/kimi-k2-instruct",
+    # moonshotai/kimi-k2-instruct removed 2026-08-20: 404 model_not_found on
+    # every call. A rung that cannot answer still gets tried on every ladder
+    # walk and, worse, its 404 became the "Last:" error in the leg's verdict —
+    # so the log blamed a model nobody uses for a failure the primary caused.
 ]
 # OpenRouter free model slugs get retired without notice. If the configured
 # model 404s ("unavailable for free"), the provider walks this list so the app

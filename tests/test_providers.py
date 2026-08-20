@@ -495,3 +495,46 @@ def test_groq_all_models_rate_limited_still_reports_rate_limited(monkeypatch):
 
     with pytest.raises(ProviderRateLimited):
         GroqProvider().generate(SYSTEM, USER)
+
+
+def test_all_models_rejecting_json_is_not_a_permanent_provider_death(monkeypatch):
+    """2026-08-20: a stranger pasted prose, the oversized chunk made EVERY Groq
+    model answer 400 json_validate_failed, and the leg raised "No working Groq
+    model found" - a string _is_permanent_failure() matches, so the waterfall
+    benched Groq for 600 SECONDS. One bad request, ten minutes of 502s for
+    every user. json_validate_failed is a fact about THIS REQUEST (usually an
+    oversized chunk), not a dead provider: the same model serves a smaller
+    chunk fine. It must never read as permanent."""
+    from app.providers import groq as groq_mod
+    from app.providers.waterfall import _is_permanent_failure
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "m1")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["m1", "m2"])
+    _groq_client(monkeypatch, {
+        "m1": _groq_err(groq_mod.groq_sdk.BadRequestError, "400 json_validate_failed"),
+        "m2": _groq_err(groq_mod.groq_sdk.BadRequestError, "400 json_validate_failed"),
+    })
+
+    with pytest.raises(ProviderError) as excinfo:
+        GroqProvider().generate(SYSTEM, USER)
+    assert not _is_permanent_failure(str(excinfo.value)), (
+        f"request-specific JSON failure read as permanent: {excinfo.value}"
+    )
+
+
+def test_genuinely_dead_models_still_read_as_permanent(monkeypatch):
+    """The opposite guard: models that are actually gone (404 / decommissioned)
+    SHOULD bench the leg, or every call re-walks a graveyard."""
+    from app.providers import groq as groq_mod
+    from app.providers.waterfall import _is_permanent_failure
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "m1")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["m1", "m2"])
+    _groq_client(monkeypatch, {
+        "m1": _groq_err(groq_mod.groq_sdk.NotFoundError, "404 model not found"),
+        "m2": _groq_err(groq_mod.groq_sdk.NotFoundError, "404 model not found"),
+    })
+
+    with pytest.raises(ProviderError) as excinfo:
+        GroqProvider().generate(SYSTEM, USER)
+    assert _is_permanent_failure(str(excinfo.value))

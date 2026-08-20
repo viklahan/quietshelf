@@ -51,6 +51,7 @@ class GroqProvider(Provider):
 
         last_exc: Exception | None = None
         rate_limited = False  # at least one model on the ladder returned 429
+        json_rejected = False  # at least one model returned 400 json_validate_failed
         for model in models_to_try:
             kwargs: dict = {
                 "model": model,
@@ -87,14 +88,21 @@ class GroqProvider(Provider):
                 # 2026: every call 400'd on a dead primary while four healthy
                 # fallbacks sat unused).
                 msg = str(exc)
-                dead_model = any(k in msg.lower() for k in (
+                low = msg.lower()
+                # "Failed to validate JSON" is not a dead model and not a dead
+                # provider - it is a fact about THIS REQUEST. It fires when the
+                # prompt is too large for the model to close the schema, so the
+                # same model serves a smaller chunk perfectly. Tracked apart
+                # from genuine retirements so the ladder's verdict below can
+                # tell "everything is gone" from "this one request was bad".
+                json_reject = any(k in low for k in (
+                    "json_validate_failed", "failed to validate json",
+                ))
+                if json_reject:
+                    json_rejected = True
+                dead_model = json_reject or any(k in low for k in (
                     "decommission", "deprecat", "model_not_found",
                     "does not exist", "invalid model", "no longer supported",
-                    # This model cannot honour response_format=json_object for
-                    # our prompt (Groq: "Failed to validate JSON"). That is a
-                    # fact about the MODEL, not the provider — the next one on
-                    # the ladder may serve it fine, and on 2026-08-07 one did.
-                    "json_validate_failed", "failed to validate json",
                 ))
                 if dead_model:
                     logger.warning("groq: model %s rejected (%.200s), trying next", model, msg)
@@ -111,6 +119,19 @@ class GroqProvider(Provider):
             # rate limit (retryable, cools down) rather than a hard error.
             raise ProviderRateLimited(
                 f"All Groq models rate-limited. Tried: {models_to_try}. Last: {last_exc}"
+            )
+        if json_rejected:
+            # Every model refused to close the JSON schema for this prompt.
+            # Saying "No working Groq model found" here is a lie the waterfall
+            # believes: _is_permanent_failure() matches that phrase and benches
+            # the provider for 600s, so one oversized paste blacked the site out
+            # for ten minutes on 2026-08-20. Word this as what it is - a bad
+            # request, retryable with smaller input - and keep every phrase
+            # _is_permanent_failure() looks for out of it.
+            raise ProviderError(
+                f"Groq could not return valid JSON for this request on any model "
+                f"(tried {len(models_to_try)}). Usually an oversized chunk; a "
+                f"smaller request normally succeeds. Last: {str(last_exc)[:200]}"
             )
         raise ProviderError(
             f"No working Groq model found. Tried: {models_to_try}. Last: {last_exc}"

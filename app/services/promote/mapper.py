@@ -31,9 +31,19 @@ from app.services.storymap.models import Character, StoryMap
 
 logger = logging.getLogger("quietshelf.promote")
 
-CHUNK_TARGET_WORDS = 400      # ~160s of narration per chunk. 200 was too small —
-                               # fragments lack narrative context for good search terms.
-                               # 400 halves API calls and doubles coherence.
+# Measured 2026-08-20 against openai/gpt-oss-120b on Groq — same essay, same
+# prompt, chunk size the only variable:
+#     150 words -> 8/8 valid JSON (100%)
+#     250 words -> 4/6 (67%)
+#     400 words -> 2/4 (50%)
+# A 400-word chunk asks for ~12 segments x 6 search terms = 70+ constrained
+# fields in ONE response; the longer the model generates, the likelier Groq's
+# validator rejects the lot with 400 json_validate_failed. 223fcb0 raised this
+# 200 -> 400 to "halve API calls" and quietly made every mapping call a coin
+# flip — a failed chunk costs a retry, a keyword fallback, or the whole run,
+# which is far more expensive than an extra call. Reliability wins.
+# Tune with PROMOTE_CHUNK_WORDS if you move to a paid tier or a stricter model.
+CHUNK_TARGET_WORDS = max(60, int(os.getenv("PROMOTE_CHUNK_WORDS", "150")))
 RATE_LIMIT_RETRIES = 2        # per-chunk retries if a parallel burst gets throttled
 
 
@@ -267,12 +277,27 @@ def _chunk_script(script: str, target_words: int) -> list[str]:
         # A single group larger than target: split it beat-by-beat
         if group_words > target_words:
             for beat in group:
-                bw = len(beat.split())
-                if current and current_words + bw > target_words:
-                    chunks.append('\n'.join(current))
-                    current, current_words = [], 0
-                current.append(beat)
-                current_words += bw
+                # A beat that is ITSELF over the target has no line breaks
+                # to split on - this is prose pasted out of a document,
+                # where the whole essay arrives as one 'beat'. Before
+                # 2026-08-20 it went to the model in a SINGLE call: a
+                # 5,000-word request that returned vague output at best and
+                # 400 json_validate_failed at worst - and that 400 walked
+                # the model ladder into 'No working Groq model found', a
+                # PERMANENT verdict that benched the whole provider for
+                # 600s for every user. One stranger's paste, ten minutes of
+                # outage. Sentences are the only boundary such text offers.
+                # A writer who DID break lines never reaches this branch and
+                # keeps their pacing exactly as written.
+                units = (_split_sentences(beat)
+                         if len(beat.split()) > target_words else [beat])
+                for unit in units:
+                    uw = len(unit.split())
+                    if current and current_words + uw > target_words:
+                        chunks.append('\n'.join(current))
+                        current, current_words = [], 0
+                    current.append(unit)
+                    current_words += uw
         else:
             current.extend(group)
             current_words += group_words
@@ -337,13 +362,91 @@ def _map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult:
             time.sleep(2.0)
 
 
+def _norm(text: str) -> str:
+    """Comparison form: lowercase, alphanumerics and single spaces only. The
+    model is told to copy lines verbatim, but it still varies quotes, dashes
+    and spacing; comparing on raw text would report phantom gaps."""
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text.lower()).split())
+
+
+def _repair_coverage(chunk: str, result: ChunkResult) -> ChunkResult:
+    """Guarantee the writer's words survive the mapping.
+
+    "Cover EVERY line" is an instruction to the model, not a promise it keeps.
+    On 2026-08-20 a 549-word essay came back as 14 good segments with 97 words
+    silently missing from the middle - the writer's own text, dropped, with
+    nothing on screen admitting it. Coverage is the contract: what they pasted
+    is what gets mapped.
+
+    Any run of lines no segment covers is reinstated in its original position
+    as a keyword-mapped segment flagged needs_remap, so the UI shows it and the
+    remap button can fix it. Never hidden, never faked, never silently lost.
+    """
+    units = [u.strip() for u in chunk.split("\n") if u.strip()]
+    if not units or not result.segments:
+        return result
+
+    covered = _norm(" ".join(s.script_text for s in result.segments))
+
+    def _is_covered(unit: str) -> bool:
+        n = _norm(unit)
+        if not n:
+            return True
+        if n in covered:
+            return True
+        # A model that trimmed a trailing clause still covered the beat; match
+        # on the opening phrase rather than reporting a false gap.
+        probe = " ".join(n.split()[:8])
+        return bool(probe) and probe in covered
+
+    missing = [i for i, u in enumerate(units) if not _is_covered(u)]
+    if not missing:
+        return result
+
+    unit_norms = [_norm(u) for u in units]
+    placed: list[tuple[float, int, ChunkSegment]] = []
+    for order, seg in enumerate(result.segments):
+        seg_norm = _norm(seg.script_text)
+        pos = next((i for i, un in enumerate(unit_norms) if un and un in seg_norm), None)
+        placed.append((float(pos if pos is not None else order), order, seg))
+
+    runs: list[list[int]] = []
+    for i in missing:
+        if runs and i == runs[-1][-1] + 1:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+
+    for run in runs:
+        text = "\n".join(units[i] for i in run)
+        words = max(1, len(text.split()))
+        placed.append((float(run[0]), -1, ChunkSegment(
+            script_text=text,
+            search_terms=_keywords(text),
+            clip_duration_seconds=max(2, round(words / 150 * 60)),
+            mood="neutral",
+            needs_remap=True,
+        )))
+
+    placed.sort(key=lambda t: (t[0], t[1]))
+    recovered_words = sum(len(units[i].split()) for i in missing)
+    logger.warning(
+        "coverage_repair recovered=%d words in %d run(s) the model skipped",
+        recovered_words, len(runs),
+    )
+    return ChunkResult(
+        video_title_suggestion=result.video_title_suggestion,
+        segments=[seg for _pos, _ord, seg in placed],
+    )
+
+
 def _try_map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult | None:
     """Returns None (-> local fallback) only when the model RESPONDED but its
     output was unparseable. Infrastructure failures (rate limit, upstream error,
     bad key) propagate so the writer gets an honest "try again" instead of a
     whole script silently degraded to keyword-only mapping."""
     try:
-        return _map_chunk(chunk, system)
+        return _repair_coverage(chunk, _map_chunk(chunk, system))
     except JSONParseError:
         logger.warning("chunk_parse_failed -> local fallback")
         return None

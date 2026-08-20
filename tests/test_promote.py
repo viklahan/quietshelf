@@ -171,3 +171,121 @@ def test_long_script_rejected(client, monkeypatch):
     response = client.post("/api/promote", json={"script": "word " * 5001})
     assert response.status_code == 422
     assert "too long" in response.json()["detail"].lower()
+
+
+# ── Regression: pasted prose must chunk (2026-08-20) ─────────────────────────
+def test_pasted_prose_without_line_breaks_still_chunks():
+    """A stranger pastes an essay out of a Google Doc: one paragraph, no line
+    breaks. _beats() makes that ONE beat, and a lone beat cannot be split by
+    the group loop — so the whole script went to the model in a single call.
+    That is how a 5,000-word story became one request: thin output at best,
+    400 json_validate_failed at worst, which then poisoned the entire Groq leg
+    for 600s. Every chunk must respect the word target regardless of how the
+    writer formatted their text."""
+    from app.services.promote.mapper import _chunk_script
+
+    sentence = "The lighthouse had been dark for eleven years when Mara came home. "
+    prose = (sentence * 60).strip()          # ~720 words, ZERO line breaks
+    chunks = _chunk_script(prose, 400)
+
+    assert len(chunks) > 1, "single-paragraph prose was not chunked"
+    assert max(len(c.split()) for c in chunks) <= 400
+
+
+def test_chunking_loses_no_words_from_pasted_prose():
+    """The writer's word count is the contract - chunking may regroup text but
+    must never drop or duplicate it."""
+    from app.services.promote.mapper import _chunk_script, _clean_transcript
+
+    sentence = "She climbed the hill through wet grass past the old cottage. "
+    prose = (sentence * 50).strip()
+    expected = len(_clean_transcript(prose)[0].split())
+    got = sum(len(c.split()) for c in _chunk_script(prose, 400))
+    assert got == expected, f"chunking changed word count: {got} != {expected}"
+
+
+def test_line_broken_scripts_still_honor_the_writers_beats():
+    """The 2026-08-07 behaviour must survive: when the writer DID break lines,
+    those breaks remain the pacing and are not re-split on sentences."""
+    from app.services.promote.mapper import _chunk_script
+
+    script = "\n".join(f"Beat number {i} lands here." for i in range(1, 21))
+    chunks = _chunk_script(script, 400)
+    assert len(chunks) == 1
+    assert chunks[0].count("\n") == 19, "line breaks were not preserved as beats"
+
+
+# ── Regression: the model silently skipping the writer's words (2026-08-20) ──
+def test_coverage_repair_recovers_lines_the_model_skipped():
+    """"Cover EVERY line" is an instruction to the model, not a guarantee. On a
+    549-word essay the model returned 14 good segments and silently dropped 97
+    words in the middle - the writer's text, gone, with nothing on screen
+    saying so. Coverage is the writer's contract: what they pasted is what gets
+    mapped. Skipped runs come back as segments flagged needs_remap, in their
+    original position, never hidden and never faked."""
+    from app.services.promote.mapper import _repair_coverage
+    from app.services.promote.models import ChunkResult, ChunkSegment
+
+    chunk = "\n".join([
+        "The first line opens the passage.",
+        "The second line is the one the model dropped.",
+        "The third line was also dropped.",
+        "The fourth line closes the passage.",
+    ])
+    partial = ChunkResult(video_title_suggestion="t", segments=[
+        ChunkSegment(script_text="The first line opens the passage.",
+                     search_terms=["a b", "c d", "e f"],
+                     clip_duration_seconds=3, mood="quiet"),
+        ChunkSegment(script_text="The fourth line closes the passage.",
+                     search_terms=["a b", "c d", "e f"],
+                     clip_duration_seconds=3, mood="hopeful"),
+    ])
+
+    repaired = _repair_coverage(chunk, partial)
+    blob = " ".join(s.script_text for s in repaired.segments)
+    assert "second line" in blob, "dropped line was not recovered"
+    assert "third line" in blob, "dropped line was not recovered"
+    # recovered text is flagged, and the model's own segments are left alone
+    recovered = [s for s in repaired.segments if s.needs_remap]
+    assert recovered and all(not s.needs_remap for s in repaired.segments
+                             if "first line" in s.script_text)
+    # original order preserved
+    texts = [s.script_text for s in repaired.segments]
+    assert texts.index([t for t in texts if "first" in t][0]) < \
+           texts.index([t for t in texts if "fourth" in t][0])
+
+
+def test_coverage_repair_is_a_no_op_when_the_model_covered_everything():
+    """A good run must not gain phantom segments."""
+    from app.services.promote.mapper import _repair_coverage
+    from app.services.promote.models import ChunkResult, ChunkSegment
+
+    chunk = "Only line here."
+    full = ChunkResult(video_title_suggestion="t", segments=[
+        ChunkSegment(script_text="Only line here.", search_terms=["a b", "c d", "e f"],
+                     clip_duration_seconds=3, mood="quiet"),
+    ])
+    repaired = _repair_coverage(chunk, full)
+    assert len(repaired.segments) == 1
+    assert not repaired.segments[0].needs_remap
+
+
+def test_chunk_target_is_small_enough_for_reliable_json():
+    """Measured 2026-08-20 against openai/gpt-oss-120b on Groq, same essay,
+    same prompt - the ONLY variable was chunk size:
+
+        150 words -> 8/8  valid JSON (100%)
+        250 words -> 4/6  (67%)
+        400 words -> 2/4  (50%)
+
+    A 400-word chunk asks for ~12 segments x 6 search terms = 70+ constrained
+    fields in one response, and the longer the model generates the likelier
+    Groq's validator rejects the whole thing with 400 json_validate_failed.
+    Commit 223fcb0 raised this 200 -> 400 to halve API calls and made every
+    mapping call a coin flip. Reliability beats call count: a failed chunk
+    costs a retry, a fallback, or the whole run."""
+    from app.services.promote import mapper
+
+    assert mapper.CHUNK_TARGET_WORDS <= 200, (
+        f"chunk target {mapper.CHUNK_TARGET_WORDS} is in the coin-flip range"
+    )

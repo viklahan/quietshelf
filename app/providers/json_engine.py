@@ -65,12 +65,24 @@ def _extract_json(raw: str) -> dict:
     pass (control chars, trailing commas) and retry before giving up. Raises
     ValueError if no JSON object can be recovered."""
     text = _isolate_object(raw)
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # json.JSONDecodeError subclasses ValueError, so a still-broken repair
-        # still surfaces as ValueError to generate_json's handler below.
-        return json.loads(_repair_json(text))
+    # raw_decode, not loads: reasoning models (openai/gpt-oss-*) emit a complete
+    # JSON object and then keep talking about their choices. loads() rejects the
+    # whole thing as "Extra data" and a perfectly good mapping is discarded - on
+    # 2026-08-20 that discard walked the Groq model ladder until the entire leg
+    # was declared unusable. Parse the first complete object; ignore the essay
+    # that follows. The repair pass still gets its turn if the object itself is
+    # malformed rather than merely followed by chatter.
+    decoder = json.JSONDecoder()
+    for candidate in (text, _repair_json(text)):
+        try:
+            obj, _end = decoder.raw_decode(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    # json.JSONDecodeError subclasses ValueError, so a still-broken repair
+    # still surfaces as ValueError to generate_json's handler below.
+    return json.loads(_repair_json(text))
 
 
 def generate_json(system_prompt: str, user_content: str, model: type[T]) -> T:
