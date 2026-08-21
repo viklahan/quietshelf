@@ -526,7 +526,8 @@ function Promote() {
           {mappedWords > 0 && inputWordCount > 0 ? (
             <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
               {'· '}{mappedWords.toLocaleString()} of {inputWordCount.toLocaleString()} words covered
-              {mappedWords < inputWordCount * 0.95 ? ' ⚠️ incomplete' : ' ✓'}
+              {isLoading ? null
+                : mappedWords < inputWordCount * 0.95 ? ' ⚠️ incomplete' : ' ✓'}
             </span>
           ) : null}
           {isLoading ? (
