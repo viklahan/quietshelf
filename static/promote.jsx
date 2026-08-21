@@ -312,17 +312,22 @@ function Promote() {
             const measured = (Date.now() - runStartRef.current) / 1000 / done;
             chunkEstRef.current = Math.max(8, Math.min(90, measured));
           }
-          // Buffer each chunk's cards under its chunk_index in a ref (survives
-          // re-renders and is never serialized). Chunks arrive out of order
-          // (fastest first), so we sort by index before display or slide 1
-          // shows middle-of-script text.
+          // Chunks arrive fastest-first, not in reading order. Sorting only the
+          // chunks RECEIVED is not enough: if chunk 3 lands first it becomes the
+          // whole list and gets renumbered 01, 02, 03 - so the writer watches the
+          // fourth part of their own story appear as slide one and then jump when
+          // chunk 0 finally arrives. Reveal only the contiguous run starting at
+          // chunk 0, so slide 1 is always slide 1, numbering never changes
+          // retroactively, and cards only ever append. The "mapping segment N of
+          // M" hint already tells them work is still happening.
           chunkBufferRef.current[chunkIndex] = newSegs.map(toCard);
           const buffer = chunkBufferRef.current;
           const ordered = [];
-          Object.keys(buffer)
-            .map(Number)
-            .sort(function(a, b) { return a - b; })
-            .forEach(function(k) { buffer[k].forEach(function(c) { ordered.push(c); }); });
+          const limit = total || Object.keys(buffer).length;
+          for (let k = 0; k < limit; k++) {
+            if (!buffer[k]) break;              // a gap: hold everything after it
+            buffer[k].forEach(function(c) { ordered.push(c); });
+          }
           // Renumber display indices sequentially in script order
           ordered.forEach(function(c, i) { c.index = i + 1; });
           setSegs(function(prev) {

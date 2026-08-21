@@ -580,25 +580,41 @@ def _snap_to_source(chunk: str, result: ChunkResult) -> ChunkResult:
 
 
 def _normalise_terms(terms: list[str], context: str = "") -> list[str]:
-    """Hold every search term to the prompt's own 2-5 word rule.
+    """Hold every search term to the prompt's own 2-5 word rule, and strip the
+    camera framing.
 
-    _pad_short_terms only ever fixed the short side, so 6- and 7-word terms
-    reached the UI (8 of 185 in a live run). An over-long query fails for the
-    same reason the full phrases failed on Coverr: the more words a stock search
-    must match, the likelier it matches nothing. Trim from the front, which is
-    where the model puts framing words ("medium", "wide", "close-up of"), and
-    keep the subject.
+    Two separate faults. _pad_short_terms only ever fixed the SHORT side, so 6-
+    and 7-word terms reached the UI (8 of 185 in a live run) - an over-long query
+    fails for the same reason the full phrases failed on Coverr: the more words a
+    stock search must match, the likelier it matches nothing.
+
+    And framing words are camera directions, not things a stock library indexes.
+    "wide shot of empty office hallway" makes the engine match on "wide" and
+    "shot"; "empty office hallway" finds the clip. They are stripped from EVERY
+    term now, not only the long ones.
+
+    What must never happen is losing the subject - that is the writer's scene.
+    Framing comes off first; only if the result is still too long do stopwords
+    go, then a trim from the front, where the model front-loads its scaffolding.
+    A term that would be emptied is kept as it was.
     """
     out: list[str] = []
     for term in terms:
         words = term.strip().split()
+        if not words:
+            continue
+        stripped = [w for w in words if w.lower().strip(",.") not in _TERM_FRAMING]
+        # Never let framing-stripping delete the term itself.
+        if len(stripped) >= TERM_MIN_WORDS:
+            words = stripped
+        elif stripped:
+            words = stripped
         if len(words) > TERM_MAX_WORDS:
-            trimmed = [w for w in words if w.lower() not in _TERM_FRAMING]
-            if len(trimmed) > TERM_MAX_WORDS:
-                trimmed = [w for w in trimmed if w.lower() not in _STOPWORDS]
-            if not TERM_MIN_WORDS <= len(trimmed) <= TERM_MAX_WORDS:
-                trimmed = (trimmed or words)[-TERM_MAX_WORDS:]
-            words = trimmed
+            leaner = [w for w in words if w.lower() not in _STOPWORDS]
+            if len(leaner) >= TERM_MIN_WORDS:
+                words = leaner
+        if len(words) > TERM_MAX_WORDS:
+            words = words[-TERM_MAX_WORDS:]
         out.append(" ".join(words))
     return _pad_short_terms(out, context) if context else out
 

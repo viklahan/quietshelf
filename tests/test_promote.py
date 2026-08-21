@@ -545,3 +545,33 @@ def test_search_terms_are_trimmed_to_the_five_word_rule():
     for t in terms:
         assert len(t.split()) <= 5, f"term still over the limit: {t!r}"
     assert "still lake morning" in terms, "a legal term was modified"
+
+
+def test_framing_words_are_stripped_from_every_term():
+    """Framing words are camera directions, not things a stock library indexes.
+    "wide shot of empty office hallway" makes a search engine match on "wide" and
+    "shot"; "empty office hallway" finds the clip. Stripped from EVERY term, not
+    only over-long ones - but the subject must survive intact, because losing a
+    content word is losing the writer's scene."""
+    from app.services.promote.mapper import _normalise_terms
+
+    cases = {
+        "wide shot of empty office hallway": "empty office hallway",
+        "close-up of hands passing bread": "hands passing bread",
+        "medium hands oiling rusted gear": "hands oiling rusted gear",
+        "still lake morning": "still lake morning",          # nothing to strip
+        "lighthouse beam cutting through dusk": "lighthouse beam cutting through dusk",
+    }
+    got = _normalise_terms(list(cases), context="An empty office hallway at dawn.")
+    for (src, want), actual in zip(cases.items(), got):
+        assert actual == want, f"{src!r} -> {actual!r}, expected {want!r}"
+
+
+def test_a_term_made_only_of_framing_words_survives():
+    """Stripping must never empty a term - something searchable has to remain."""
+    from app.services.promote.mapper import _normalise_terms
+
+    got = _normalise_terms(["wide shot", "close-up of"],
+                           context="The lighthouse beam swung across the water.")
+    for t in got:
+        assert len(t.split()) >= 2, f"term was reduced to nothing: {t!r}"
