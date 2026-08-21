@@ -73,7 +73,15 @@ def cerebras() -> str:
     if "_error" in h:
         return f"cerebras    UNREACHABLE {h['_error']}"
     if status == 402:
-        return "cerebras    402 PAYMENT REQUIRED - account unpaid, a new key will not help"
+        # Do NOT state this is unpaid. On 2026-08-20 the console showed real
+        # quota allocated (gpt-oss-120b: 5 req/min, 90,000 tokens/min) while the
+        # API returned 402 for this key - which means the KEY belongs to a
+        # different account than the console being looked at. Report the fact,
+        # name both causes, and let the console settle it.
+        return ("cerebras    402 payment_required - either the account has no "
+                "quota, OR this key belongs to a different account than the "
+                "console you are reading. Check cloud.cerebras.ai API keys "
+                "before assuming billing.")
     tpm = h.get("x-ratelimit-limit-tokens-minute", h.get("x-ratelimit-limit-tokens", "?"))
     return f"cerebras    HTTP {status:<3}  {tpm} tokens/min"
 
