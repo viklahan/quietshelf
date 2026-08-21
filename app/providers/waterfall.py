@@ -13,6 +13,7 @@ waterfall skips Cerebras for large calls automatically.
 from __future__ import annotations
 import concurrent.futures
 import logging
+import os
 import time
 from app import config
 from app.providers.base import (
@@ -102,7 +103,11 @@ TIMEOUT_COOLDOWN_SECONDS = 300.0  # shorter than a dead key: slowness does heal
 # abandoned worker is a daemon and dies with the process; after
 # TIMEOUT_STREAK_LIMIT of these the leg is cooled down and stops being called
 # at all, so the leak is bounded.
-PROVIDER_DEADLINE_SECONDS = 45.0
+# 45s was sized against ONE request at a time. With PROMOTE_CONCURRENCY>2 a
+# provider legitimately queues, so healthy-but-queued calls started tripping the
+# deadline - and two of those in a row benched the only working leg for 300s
+# (2026-08-20). Still comfortably inside the stream's 180s budget.
+PROVIDER_DEADLINE_SECONDS = float(os.getenv("PROVIDER_DEADLINE_SECONDS", "90"))
 
 _dead: dict[str, tuple[float, str]] = {}  # name -> (until_ts, reason)
 _timeout_streak: dict[str, int] = {}      # name -> consecutive timeouts
@@ -179,6 +184,19 @@ class WaterfallProvider(Provider):
 
     def generate(self, system_prompt: str, user_content: str, json_mode: bool = True) -> str:
         order = config.waterfall_order()
+        # A cooldown is an OPTIMIZATION - skip a known corpse for free - and it
+        # must never become a suicide pact. On 2026-08-20 two slow chunks tripped
+        # TIMEOUT_STREAK_LIMIT, benched Groq (the only healthy leg) for 300s, and
+        # every chunk after that was guaranteed keyword garbage while a working
+        # provider sat idle. When EVERY leg is cooling there is nothing left to
+        # protect: a possibly-slow call beats certain fallback, so clear and run.
+        if order and all(_dead_reason(name) is not None for name in order):
+            logger.warning(
+                "waterfall: all %d legs cooling down - clearing and trying anyway "
+                "(a slow call beats certain fallback)", len(order),
+            )
+            for name in order:
+                _revive(name)
         call_len = len(system_prompt) + len(user_content)
         errors: list[str] = []
 

@@ -538,3 +538,50 @@ def test_genuinely_dead_models_still_read_as_permanent(monkeypatch):
     with pytest.raises(ProviderError) as excinfo:
         GroqProvider().generate(SYSTEM, USER)
     assert _is_permanent_failure(str(excinfo.value))
+
+
+def test_waterfall_ignores_cooldowns_when_every_leg_is_benched(monkeypatch):
+    """2026-08-20: two chunks exceeded the 45s deadline, TIMEOUT_STREAK_LIMIT
+    benched Groq - the ONLY healthy provider - for 300s, and every chunk after
+    that was guaranteed keyword garbage while a working provider sat idle.
+
+    A cooldown is an optimization: skip a known corpse for free. It must never
+    become a suicide pact. When EVERY leg is cooling, a possibly-slow call
+    beats certain garbage, so the cooldowns are cleared and the ladder runs."""
+    from app.providers import waterfall as wf
+
+    monkeypatch.setattr(wf.config, "waterfall_order", lambda: ["groq", "gemini"])
+    monkeypatch.setattr(wf, "_build_provider", lambda name: _StubProvider(name))
+    wf._dead.clear()
+    wf._mark_dead("groq", "2 consecutive timeouts")
+    wf._mark_dead("gemini", "429 daily quota")
+
+    out = wf.WaterfallProvider().generate("sys", "user", True)
+    assert out == "groq-ok", "waterfall refused to try any leg while all were cooling"
+    wf._dead.clear()
+
+
+def test_waterfall_still_skips_a_corpse_when_a_healthy_leg_exists(monkeypatch):
+    """The opposite guard: with a live alternative, a cooled-down leg is still
+    skipped for free - that zero-cost skip is why the cooldown exists."""
+    from app.providers import waterfall as wf
+
+    monkeypatch.setattr(wf.config, "waterfall_order", lambda: ["groq", "gemini"])
+    monkeypatch.setattr(wf, "_build_provider", lambda name: _StubProvider(name))
+    wf._dead.clear()
+    wf._mark_dead("groq", "dead key")
+
+    out = wf.WaterfallProvider().generate("sys", "user", True)
+    assert out == "gemini-ok", "cooled-down leg was tried despite a healthy alternative"
+    wf._dead.clear()
+
+
+class _StubProvider:
+    def __init__(self, name):
+        self.name = name
+
+    def validate_config(self):
+        return None
+
+    def generate(self, system_prompt, user_content, json_mode=True):
+        return f"{self.name}-ok"
