@@ -585,3 +585,40 @@ class _StubProvider:
 
     def generate(self, system_prompt, user_content, json_mode=True):
         return f"{self.name}-ok"
+
+
+def test_compound_models_are_called_without_response_format(monkeypatch):
+    """groq/compound serves the Promote schema in 4.4s - FASTER than the
+    gpt-oss-120b primary - but rejects response_format=json_object outright, so
+    a hardcoded json_object made it permanently unusable and the ladder walked
+    two rungs that mostly 400 instead. _extract_json (raw_decode since
+    2026-08-20) already tolerates prose around a JSON object, so dropping the
+    parameter for these models costs nothing and buys a real fallback."""
+    from app.providers import groq as groq_mod
+
+    seen: list[dict] = []
+
+    class _Completions:
+        def create(self, **kwargs):
+            seen.append(kwargs)
+            msg = type("M", (), {"content": '{"ok": true}'})
+            return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.chat = type("Chat", (), {"completions": _Completions()})
+
+    monkeypatch.setattr(groq_mod.groq_sdk, "Groq", _Client)
+    monkeypatch.setattr(groq_mod, "acquire_slot", lambda *a, **k: None)
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "groq/compound")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["groq/compound"])
+    GroqProvider().generate(SYSTEM, USER, True)
+    assert "response_format" not in seen[-1], "compound was sent response_format and will 400"
+
+    monkeypatch.setattr(groq_mod.config, "model_name", lambda p=None: "openai/gpt-oss-120b")
+    monkeypatch.setattr(groq_mod.config, "groq_fallback_models", lambda: ["openai/gpt-oss-120b"])
+    GroqProvider().generate(SYSTEM, USER, True)
+    assert seen[-1].get("response_format") == {"type": "json_object"}, (
+        "constrained decoding was dropped for a model that supports it"
+    )

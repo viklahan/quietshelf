@@ -25,8 +25,13 @@ DEFAULT_MODELS = {
 # Verified current on Groq free tier as of July 2026.
 DEFAULT_GROQ_FALLBACKS = [
     "openai/gpt-oss-120b",
+    # Measured 2026-08-20 on the Promote schema, 2 chunks each:
+    #   gpt-oss-120b  2/2  6.4s   groq/compound 2/2  4.4s
+    #   gpt-oss-20b   1/2         qwen3.6-27b   0/2  (400 json_validate_failed)
+    # compound is the only fallback that reliably answers, and it is faster than
+    # the primary. qwen dropped: it has never once served this schema.
+    "groq/compound",
     "openai/gpt-oss-20b",
-    "qwen/qwen3.6-27b",
     # moonshotai/kimi-k2-instruct removed 2026-08-20: 404 model_not_found on
     # every call. A rung that cannot answer still gets tried on every ladder
     # walk and, worse, its 404 became the "Last:" error in the leg's verdict —

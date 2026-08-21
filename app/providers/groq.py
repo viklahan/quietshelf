@@ -20,6 +20,9 @@ from app.providers.base import (
 )
 from app.providers.pacing import acquire_slot
 
+# Models that 400 on response_format=json_object and must be asked in prose.
+NO_RESPONSE_FORMAT_PREFIXES = ("groq/compound",)
+
 logger = logging.getLogger("quietshelf.groq")
 
 
@@ -60,7 +63,13 @@ class GroqProvider(Provider):
                     {"role": "user", "content": user_content},
                 ],
             }
-            if json_mode:
+            # groq/compound* reject response_format outright (400), yet they
+            # serve this schema FASTER than the gpt-oss primary - measured 4.4s
+            # vs 6.4s on 2026-08-20. Sending it unconditionally made the only
+            # healthy fallback permanently unusable. _extract_json parses the
+            # first complete object and ignores surrounding prose, so asking
+            # nicely in the prompt is enough for these.
+            if json_mode and not model.startswith(NO_RESPONSE_FORMAT_PREFIXES):
                 kwargs["response_format"] = {"type": "json_object"}
             try:
                 response = client.chat.completions.create(**kwargs)
