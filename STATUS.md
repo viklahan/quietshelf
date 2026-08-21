@@ -1,6 +1,6 @@
 # Quiet Shelf — STATUS
 
-_Continuity doc. Last updated 2026-08-20 (late). Read this first on any return._
+_Continuity doc. Last updated 2026-08-21. Read this first on any return._
 
 ## Where it stands: **LIVE IN PRODUCTION**
 
@@ -11,13 +11,17 @@ Five services work, are hardened, and are running in production. First real
 user (a writer friend) has been testing since 07-12 and reports he'll "use it
 all the time." Work is paused at a clean stopping point.
 
-**Live risk as of 08-20: provider health, not code — confirmed twice now.**
-Free-tier keys are the single point of failure. On 08-19 the Groq key went
-invalid (401) and Cerebras stayed unpaid (402), which left only Gemini's
-20-req/day tier; one Promote run exhausted it and the whole site returned 502
-on every AI path while nginx, uvicorn, TLS and the deploy were all perfectly
-healthy. Groq is carrying the app again. A paid leg — any paid leg — is the
-difference between "the shelf stands" and another evening like that one.
+**Live risk as of 08-21: much reduced, and now measurable.** Groq is on the paid
+Developer tier (250,000 tokens/min, verified) with `groq/compound` behind it as a
+working fallback rung, and Gemini third. Cerebras is still 402 and its free tier
+would be 5 req/min anyway — not worth chasing. The remaining single point of
+failure is Groq itself. `python3 qs_limits.py` reports what every provider
+actually grants, on either machine, in one command — run it FIRST when anything
+looks slow or degraded, before reading any code.
+
+**And check `.env` before suspecting code.** It is gitignored, so nothing ever
+reviews it. Three of the four worst problems on 08-20 were stale `.env` values
+that were correct when written and silently outlived their reason.
 
 ## Production environment
 
@@ -58,6 +62,105 @@ by design and doesn't need any.
 
 Promote also opens two sub-studios once a shot list exists: **Thumbnail Studio**
 (1280×720 YouTube thumbnails) and **Narrate** (voice-over drafting).
+
+## Shipped 2026-08-20 (night) — 14x faster, and the config that outlived its reason
+
+Promote went from **171.9s** on an 877-word script, with 7 of 25 segments
+falling back to keyword garbage, to **12.3s with zero fallbacks and 100%
+coverage**. Almost none of that was clever code. Three of the four biggest wins
+were **stale `.env` values that were correct the day they were written**:
+
+| line | was | why it was right once | why it was wrong now |
+|---|---|---|---|
+| `GROQ_RPM=5` | pacing Groq to 5 req/MIN | free tier allowed 8,000 tokens/min | paid allows 1,000 RPM. **This alone was 65.8s -> 12.0s** |
+| `PROMOTE_CONCURRENCY` | unset -> default 2 | sized so 2 chunks stayed under 8,000 TPM | paid gives 250,000 TPM; 6 fits easily |
+| `MODEL_NAME=gemini-2.5-flash` | pinned model | it existed | Google **retired** it. Inert under waterfall, detonates on any single-provider run |
+| `WATERFALL_ORDER=groq,cerebras,gemini,openrouter` | four legs | more legs = more resilience | Cerebras 402s every call, OpenRouter costs a flat 45s timeout. Now `groq,gemini` |
+
+**`.env` is gitignored, so nothing ever reviews it.** These lines sat wrong for
+weeks and every symptom they caused looked like a code bug. `qs_limits.py`
+exists because of this.
+
+### The paid Groq key (finally)
+
+The 08-07 decision to buy a small paid key was executed. Verified, not assumed:
+`groq PAID (developer) 250,000 tokens/min, 500,000 req/day` — a **31x** jump
+from the free tier's 8,000 TPM, and the console's per-model limits page matched
+`qs_limits.py` exactly. **Cost, from measured usage: ~$0.009 per 836-word run.**
+A friend using it twice a week is **~7 cents a month** against a $30 box. Billing
+is pay-as-you-go with no subscription; the first $1 threshold is roughly two
+years away at that rate.
+
+Note the trap: adding the card did **not** upgrade the key in `.env` — that key
+belonged to a *different* Groq account. A key generated from the upgraded
+account fixed it instantly. `qs_limits.py` is what caught it.
+
+### Failures that were really one failure wearing different clothes
+
+Each of these took a condition about ONE REQUEST and punished the whole run:
+
+- **A stalled chunk discarded the rest of the script.** `SSE_WAIT_TIMEOUT` is a
+  per-wait ceiling and the generator did a bare `return` — so chunk 7 of 20
+  going quiet threw away chunks 8-20, including ones certain to succeed. A
+  writer on the live site got a third of their piece and no explanation.
+  Outstanding chunks now come back as flagged fallbacks; the run completes.
+- **A rate limit was treated as a fault.** Backoff was 3s then 6s against a
+  rolling-MINUTE window, so both retries landed in the same dead window, burned
+  every attempt, and handed the writer keyword garbage for a chunk that only
+  needed to wait. Throttling now gets its own budget (3 waits x 30s) that does
+  not consume normal attempts. **A rate limit is a queue, not a failure.**
+- **A cooldown became a suicide pact.** Two chunks exceeded the 45s deadline,
+  `TIMEOUT_STREAK_LIMIT` benched Groq — the only healthy leg — for 300s, and
+  everything after was guaranteed garbage while a working provider sat idle.
+  When EVERY leg is cooling there is nothing left to protect: cooldowns are
+  cleared and the ladder runs. With a healthy alternative, the free skip stays.
+- **`PROVIDER_DEADLINE_SECONDS` 45 -> 90.** 45s was sized for one request at a
+  time. At concurrency 6 a provider legitimately queues; the measured tail hit
+  58s and 65s in a SINGLE call, no retries. Those were healthy responses the old
+  deadline would have killed.
+
+### The ladder had one working rung
+
+Quota was never the problem, capability was. Measured on the Promote schema:
+`gpt-oss-120b` 2/2 at 6.4s, **`groq/compound` 2/2 at 4.4s** (faster than the
+primary), `gpt-oss-20b` 1/2, `qwen3.6-27b` 0/2. compound was locked out purely
+because it 400s on `response_format=json_object` and the provider sent it
+unconditionally — safe to drop now that `_extract_json` uses `raw_decode`. qwen
+removed; it has never once served this schema.
+
+### Two UI truths
+
+- **The coverage badge cried wolf on every run.** It compared words-received to
+  words-submitted and rendered "⚠️ incomplete" under 95% — while streaming, when
+  it is *always* under 95%. Three separate "286 of 836", "576 ⚠️ incomplete",
+  "681" reports were runs working perfectly wearing an alarm. It now judges only
+  once the run finishes. **This sent a real debugging session chasing data loss
+  that was never happening.**
+- **Coverr and Mixkit returned nothing, and the terms were not at fault.**
+  Mixkit's link was a browse-by-TAG path, not a search: the same phrase scored
+  0 clips on the tag path and 40 on `?q=`. Coverr AND-matches a small catalogue,
+  so 2-5 word evocative phrases score **zero every time** — measured
+  `"woman staring out window quietly"` 0 vs `"woman"` 999+, `"coffee going cold
+  by laptop"` 0 vs `"coffee"` 216. Coverr now gets the subject noun; Pexels and
+  Pixabay keep the full phrase because they have the catalogue to reward it.
+
+### qs_limits.py — ask, don't assume
+
+One command reports what each provider actually grants. It closes problem #1
+from the 08-07 review ("every limit was learned by hitting it in production").
+Stdlib only — it must run on a bare `python3` over ssh, because the moment you
+need it is the moment the app is broken. It caught the wrong-Groq-account key,
+confirmed the paid upgrade, and corrected its own over-claim about Cerebras when
+V's console contradicted it.
+
+### Known limits, measured
+
+No word cap (`MIN_WORDS` 100, `MAX_WORDS` effectively unlimited). ~3,100 tokens
+and ~7s per 150-word chunk at concurrency 6 = ~51 chunks/min, against a paid
+ceiling of ~80 — **concurrency-bound, not quota-bound**, so headroom exists.
+Roughly: 2,000 words ~21s, 5,000 ~42s, 10,000 ~84s. A 25,000-word manuscript
+costs about 31 cents. **Verified end-to-end to 877 words; beyond that is
+arithmetic from measured per-chunk numbers, not observed runs.**
 
 ## Shipped 2026-08-20 — why it worked for me and broke for them
 
