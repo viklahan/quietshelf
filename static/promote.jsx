@@ -88,11 +88,59 @@ function saveLastResult(r) {
   } catch (e) {}
 }
 
+/* Search terms are written for Pexels: 2-5 words, evocative, cinematic
+   ("abandoned lighthouse tower at dusk"). Pexels and Pixabay have large
+   catalogues and rank loosely, so the whole phrase works there and the extra
+   words genuinely improve the results.
+
+   Coverr does AND-matching over a SMALL catalogue, so the same phrase returns
+   nothing at all. Measured 2026-08-20, real result counts from Coverr:
+
+     "abandoned lighthouse tower at dusk"   0  ->  "lighthouse"  2
+     "woman staring out window quietly"     0  ->  "woman"    999+
+     "coffee going cold by laptop"          0  ->  "coffee"    216
+     "two empty chairs cafe table"          0  ->  "chairs"     70
+     "gulls circling grey cloudy sky"       0  ->  "gulls"      17
+     "empty office after hours desk lamp"   0  ->  "office"    258
+
+   Every full phrase scored ZERO. The terms were not bad - they were aimed at
+   the wrong search engine. Coverr gets the subject noun instead. */
+const QS_SEARCH_STOPWORDS = {
+  a: 1, an: 1, the: 1, of: 1, in: 1, on: 1, at: 1, by: 1, to: 1, with: 1, and: 1,
+  or: 1, for: 1, from: 1, into: 1, over: 1, under: 1, near: 1, through: 1,
+  against: 1, beside: 1, behind: 1, alone: 1, down: 1, up: 1, out: 1,
+  two: 1, three: 1, four: 1, several: 1, many: 1, some: 1, one: 1,
+  empty: 1, old: 1, new: 1, small: 1, large: 1, big: 1, dark: 1, bright: 1,
+  quiet: 1, still: 1, grey: 1, gray: 1, abandoned: 1, weathered: 1, faded: 1,
+  worn: 1, distant: 1, tiny: 1, huge: 1, warm: 1, cold: 1, soft: 1,
+};
+
+/* The subject of a search term: first word that is not a function word, a
+   numeral, a scene-setting adjective, or a participle/adverb. The prompt writes
+   terms subject-first, so the first survivor is almost always the thing the
+   camera is pointed at. */
+function qsCoreTerm(term) {
+  const words = String(term || '').toLowerCase().split(/\s+/)
+    .map(function(w) { return w.replace(/[^a-z0-9-]/g, ''); })
+    .filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (QS_SEARCH_STOPWORDS[w]) continue;
+    if (w.length > 4 && (w.endsWith('ing') || w.endsWith('ly'))) continue;
+    return w;
+  }
+  return words[0] || String(term || '');
+}
+
 const QS_VIDEO_SITES = [
   { id: 'pexels',  label: 'Pexels',  url: function(term, op) { return 'https://www.pexels.com/search/videos/' + encodeURIComponent(term) + '/' + op; } },
   { id: 'pixabay', label: 'Pixabay', url: function(term) { return 'https://pixabay.com/videos/search/' + encodeURIComponent(term) + '/'; } },
-  { id: 'coverr',  label: 'Coverr',  url: function(term) { return 'https://coverr.co/s?q=' + encodeURIComponent(term); } },
-  { id: 'mixkit',  label: 'Mixkit',  url: function(term) { return 'https://mixkit.co/free-stock-video/' + encodeURIComponent(term) + '/'; } },
+  // Small catalogue, AND-matched: send the subject noun, not the full phrase.
+  { id: 'coverr',  label: 'Coverr',  url: function(term) { return 'https://coverr.co/s?q=' + encodeURIComponent(qsCoreTerm(term)); } },
+  // /free-stock-video/<term>/ is a browse-by-TAG path and 404s to an empty page
+  // for anything that is not already a tag - the full phrase scored 0 clips
+  // there while ?q= returned 40 for the identical phrase. Use the search.
+  { id: 'mixkit',  label: 'Mixkit',  url: function(term) { return 'https://mixkit.co/free-stock-video/?q=' + encodeURIComponent(term); } },
 ];
 
 function Promote() {
