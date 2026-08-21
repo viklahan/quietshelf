@@ -16,10 +16,32 @@ import json
 import os
 import urllib.error
 import urllib.request
+from pathlib import Path
 
-from dotenv import load_dotenv
+def _load_env() -> None:
+    """Read .env beside this file into os.environ, without importing anything.
 
-load_dotenv()
+    This tool exists to be run ON THE SERVER at 3am when something is wrong, so
+    it must not depend on the app's virtualenv. `python3 qs_limits.py` with a
+    bare system interpreter has to work; requiring python-dotenv made the one
+    command meant to answer "what is broken" itself the thing that was broken.
+    Existing process env always wins, matching load_dotenv(override=False).
+    """
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.is_file():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env()
 
 UA = "quietshelf-limits/1.0"
 
