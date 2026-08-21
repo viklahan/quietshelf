@@ -314,28 +314,32 @@ function Promote() {
           }
           // Chunks arrive fastest-first, not in reading order. Sorting only the
           // chunks RECEIVED is not enough: if chunk 3 lands first it becomes the
-          // whole list and gets renumbered 01, 02, 03 - so the writer watches the
+          // whole list and gets renumbered 01, 02, 03 - the writer watching the
           // fourth part of their own story appear as slide one and then jump when
-          // chunk 0 finally arrives. Reveal only the contiguous run starting at
-          // chunk 0, so slide 1 is always slide 1, numbering never changes
-          // retroactively, and cards only ever append. The "mapping segment N of
-          // M" hint already tells them work is still happening.
+          // chunk 0 arrives. Every slot is now laid out up front: a chunk that
+          // has landed shows its cards, one that has not holds a placeholder.
+          // Real content can never occupy a position that is not its own,
+          // because the space ahead of it is already spoken for.
           chunkBufferRef.current[chunkIndex] = newSegs.map(toCard);
           const buffer = chunkBufferRef.current;
           const ordered = [];
           const limit = total || Object.keys(buffer).length;
           for (let k = 0; k < limit; k++) {
-            if (!buffer[k]) break;              // a gap: hold everything after it
-            buffer[k].forEach(function(c) { ordered.push(c); });
+            if (buffer[k]) buffer[k].forEach(function(c) { ordered.push(c); });
+            else ordered.push({ pending: true, chunkIndex: k, index: 'pending-' + k });
           }
-          // Renumber display indices sequentially in script order
-          ordered.forEach(function(c, i) { c.index = i + 1; });
+          // Number the real cards in script order; placeholders carry no number
+          // because the count in front of them is not known yet.
+          let placed = 0;
+          ordered.forEach(function(c) { if (!c.pending) { placed += 1; c.index = placed; } });
           setSegs(function(prev) {
             if (prev.length === 0 && ordered.length > 0) setPhase('done');
             return ordered;
           });
+          // Placeholders are display state, never saved: a restored draft must
+          // not resurrect a slot that was only ever a loading affordance.
           saveLastResult({
-            segs: ordered,
+            segs: ordered.filter(function(c) { return !c.pending; }),
             groundedBy: grounding ? { n: grounding.characters.length, fabricated: !!grounding.fabricated } : null,
             found: {},
           });
@@ -373,17 +377,23 @@ function Promote() {
           ? Object.assign({}, s, { terms: s.terms.map(function(t, j) { return j === termIdx ? value : t; }) })
           : s;
       });
-      saveLastResult({ segs: next, groundedBy: groundedBy, found: found });
+      saveLastResult({ segs: next.filter(function(c) { return !c.pending; }),
+                       groundedBy: groundedBy, found: found });
       return next;
     });
   }
 
-  const doneCount = segs.filter(function(s) { return found[s.index]; }).length;
-  const mappedWords = segs.reduce(function(acc, s) { return acc + countWords(s.excerpt); }, 0);
-  const remapCount = segs.filter(function(s) { return s.needsRemap; }).length;
+  // Placeholders are a rendering affordance and nothing else. Every count,
+  // export and completeness judgement runs on the real cards only - a pending
+  // slot has no words, and letting one reach the word counter would make the
+  // coverage line lie about the writer's own script.
+  const realSegs = segs.filter(function(s) { return !s.pending; });
+  const doneCount = realSegs.filter(function(s) { return found[s.index]; }).length;
+  const mappedWords = realSegs.reduce(function(acc, s) { return acc + countWords(s.excerpt); }, 0);
+  const remapCount = realSegs.filter(function(s) { return s.needsRemap; }).length;
 
   function notionText() {
-    return segs.map(function(s) {
+    return realSegs.map(function(s) {
       return '## ' + String(s.index).padStart(2, '0') + ' \u00b7 ' + s.startTime + '\u2013' + s.endTime + ' \u00b7 ' + s.mood + '\n' +
         s.excerpt + '\n' +
         'Clip ~' + s.clipDurationSeconds + 's\n' +
@@ -396,7 +406,7 @@ function Promote() {
     // Remap ONLY those runs — never the whole script again.
     if (remapBusy) return;
     const runs = [];
-    segs.forEach(function(s, i) {
+    realSegs.forEach(function(s, i) {
       if (s.needsRemap) {
         const last = runs[runs.length - 1];
         if (last && last.start + last.cards.length === i) last.cards.push(s);
@@ -472,7 +482,7 @@ function Promote() {
   }
   function exportCsv() {
     const rows = [['#', 'Start', 'End', 'Excerpt', 'Mood', 'Clip (s)', 'Search terms', 'Found']];
-    segs.forEach(function(s) {
+    realSegs.forEach(function(s) {
       rows.push([s.index, s.startTime, s.endTime, s.excerpt, s.mood, s.clipDurationSeconds, s.terms.join(' / '), found[s.index] ? 'yes' : '']);
     });
     downloadFile(exportBase() + '.csv', 'text/csv',
@@ -575,7 +585,7 @@ function Promote() {
 
         <div className="qs-mapline">
           <QSIcoPromo name="list-checks" size={16} />
-          <span className="qs-mapline__count">{String(doneCount).padStart(2, '0')} of {String(segs.length).padStart(2, '0')} mapped</span>
+          <span className="qs-mapline__count">{String(doneCount).padStart(2, '0')} of {String(realSegs.length).padStart(2, '0')} mapped</span>
           {mappedWords > 0 && inputWordCount > 0 ? (
             <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
               {'· '}{mappedWords.toLocaleString()} of {inputWordCount.toLocaleString()} words covered
@@ -594,12 +604,12 @@ function Promote() {
               <QSIcoPromo name="rotate-ccw" size={13} />{remapBusy ? 'Remapping\u2026' : 'Remap ' + remapCount + ' unmapped'}
             </button>
           ) : null}
-          {!isLoading && segs.length > 0 ? (
+          {!isLoading && realSegs.length > 0 ? (
             <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={function() { setShowThumbnail(true); }}>
               <QSIcoPromo name="image" size={13} />Thumbnail Studio
             </button>
           ) : null}
-          {!isLoading && segs.length > 0 ? (
+          {!isLoading && realSegs.length > 0 ? (
             <button type="button" className="qs-payoff__again" style={{ marginRight: 'var(--space-3)' }} onClick={function() { setShowNarrate(true); }}>
               <QSIcoPromo name="mic" size={13} />Narrate
             </button>
@@ -652,6 +662,17 @@ function Promote() {
 
         <div className="qs-board">
           {segs.map(function(s, idx) {
+            if (s.pending) {
+              // Holds this chunk's place in the reading order while it maps.
+              return (
+                <div className="qs-deal" key={s.index}>
+                  <div className="qs-deal--pending" aria-busy="true" aria-live="polite">
+                    <span className="qs-deal--pending__lamp" aria-hidden="true"></span>
+                    <span className="qs-quiethint">Mapping this part of your story…</span>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div className="qs-deal" key={s.index} style={{ animationDelay: (idx * 60) + 'ms' }}>
                 <ManuscriptCard

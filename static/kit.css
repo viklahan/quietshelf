@@ -662,3 +662,23 @@
 .qs-cork__hint {
   font-size: var(--fs-small); color: var(--text-faint); margin: var(--space-3) 2px 0;
 }
+
+/* Placeholder card — holds a pending chunk's POSITION while it maps.
+   Before this, out-of-order arrivals were withheld entirely and the board sat
+   empty until chunk 0 landed. A held slot keeps the reading order honest and
+   still shows the work happening: real cards can never appear where they do not
+   belong, because the space in front of them is already spoken for. */
+.qs-deal--pending {
+  border: 1px dashed var(--rule, rgba(255, 255, 255, 0.14));
+  border-radius: var(--radius-card, 10px);
+  padding: var(--space-5) var(--space-5);
+  display: flex; align-items: center; gap: var(--space-3);
+  animation: qs-pulse 2600ms var(--ease-quiet) infinite;
+}
+.qs-deal--pending__lamp {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--ember-500);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qs-deal--pending { animation: none; }
+}
