@@ -23,6 +23,7 @@ from app.providers import (
 )
 from app.services.promote.mapper import (
     NARRATION_WPM,
+    _normalise_terms,
     narration_seconds,
     CHUNK_TARGET_WORDS,
     SYSTEM_PROMPT,
@@ -262,7 +263,7 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                     if story_map
                     else (draft.search_terms, [])
                 )
-                terms = _pad_short_terms(terms, draft.script_text)
+                terms = _normalise_terms(terms, draft.script_text)
                 segment_id[0] += 1
                 seg = Segment(
                     id=segment_id[0],

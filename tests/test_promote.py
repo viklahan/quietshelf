@@ -479,3 +479,69 @@ def test_timeline_never_runs_backwards(client, monkeypatch):
         )
         assert end >= start
         previous_end = end
+
+
+def test_segment_text_is_snapped_back_to_the_writers_exact_words():
+    """2026-08-21, live output: the model returned "I wanted to call him and
+    tell it happened" for a source line reading "...and tell HIM it happened."
+    One dropped word, silently, in the writer's own prose.
+
+    The model is asked for two things - where a segment breaks, and the text
+    itself. Only the first needs judgement; the second is a lookup, because we
+    hold the chunk. Boundaries come from the model, words come from the source."""
+    from app.services.promote.mapper import _snap_to_source
+    from app.services.promote.models import ChunkResult, ChunkSegment
+
+    chunk = ("I wanted to call him and tell him it happened.\n"
+             "My mother asked if I was excited and I said yes.\n"
+             "She told everyone at church that weekend.")
+    drifted = ChunkResult(video_title_suggestion="t", segments=[
+        ChunkSegment(script_text="I wanted to call him and tell it happened.",  # dropped "him"
+                     search_terms=["quiet kitchen morning", "hand holding phone", "cold tea mug"],
+                     clip_duration_seconds=5, mood="quiet"),
+        ChunkSegment(script_text="My mother asked if I was excited and I said yes",  # lost the period
+                     search_terms=["woman on telephone", "sunlit hallway", "framed photographs"],
+                     clip_duration_seconds=5, mood="tender"),
+    ])
+
+    snapped = _snap_to_source(chunk, drifted)
+    assert "tell him it happened" in snapped.segments[0].script_text, (
+        "the writer's dropped word was not restored"
+    )
+    for seg in snapped.segments:
+        assert seg.script_text in chunk, (
+            f"script_text is not an exact span of the source: {seg.script_text!r}"
+        )
+
+
+def test_snapping_leaves_a_faithful_transcription_untouched():
+    """A model that copied correctly must not be 'corrected' into something else."""
+    from app.services.promote.mapper import _snap_to_source
+    from app.services.promote.models import ChunkResult, ChunkSegment
+
+    chunk = "The lighthouse had been dark for eleven years.\nShe carried her father's logbook."
+    good = ChunkResult(video_title_suggestion="t", segments=[
+        ChunkSegment(script_text="The lighthouse had been dark for eleven years.",
+                     search_terms=["dark lighthouse dusk", "storm clouds coast", "cold stone tower"],
+                     clip_duration_seconds=5, mood="quiet"),
+    ])
+    out = _snap_to_source(chunk, good)
+    assert out.segments[0].script_text == "The lighthouse had been dark for eleven years."
+
+
+def test_search_terms_are_trimmed_to_the_five_word_rule():
+    """The prompt says every term must be 2-5 words; live output had 8 of 185 at
+    6-7 words. _pad_short_terms only ever fixed the SHORT side. A 7-word query is
+    the same failure as the Coverr phrases - too specific to match stock search."""
+    from app.services.promote.mapper import _normalise_terms
+
+    terms = _normalise_terms([
+        "medium card with cartoon ladder on desk",      # 7 -> must shrink
+        "oil can and rusty tools on bench",             # 7 -> must shrink
+        "group of people standing in silence",          # 6 -> must shrink
+        "still lake morning",                           # 3 -> untouched
+        "lighthouse",                                   # 1 -> padded by the caller
+    ], context="A card with a cartoon ladder sat on the desk by the oil can.")
+    for t in terms:
+        assert len(t.split()) <= 5, f"term still over the limit: {t!r}"
+    assert "still lake morning" in terms, "a legal term was modified"

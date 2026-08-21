@@ -13,6 +13,7 @@ coverage (those segments are just lower quality - the keywords are editable).
 """
 from __future__ import annotations
 
+import difflib
 import logging
 import os
 import re
@@ -44,6 +45,10 @@ logger = logging.getLogger("quietshelf.promote")
 # which is far more expensive than an extra call. Reliability wins.
 # Tune with PROMOTE_CHUNK_WORDS if you move to a paid tier or a stricter model.
 CHUNK_TARGET_WORDS = max(60, int(os.getenv("PROMOTE_CHUNK_WORDS", "150")))
+TERM_MIN_WORDS, TERM_MAX_WORDS = 2, 5   # the prompt's own rule, now enforced
+# Framing words the model prefixes; the first thing to drop when trimming.
+_TERM_FRAMING = {"medium", "wide", "close-up", "closeup", "close", "up", "of",
+                 "shot", "view", "angle", "detail", "scene"}
 RATE_LIMIT_RETRIES = 2        # per-chunk retries if a parallel burst gets throttled
 
 
@@ -467,7 +472,7 @@ def _try_map_chunk(chunk: str, system: str = SYSTEM_PROMPT) -> ChunkResult | Non
     bad key) propagate so the writer gets an honest "try again" instead of a
     whole script silently degraded to keyword-only mapping."""
     try:
-        return _repair_coverage(chunk, _map_chunk(chunk, system))
+        return _repair_coverage(chunk, _snap_to_source(chunk, _map_chunk(chunk, system)))
     except JSONParseError:
         logger.warning("chunk_parse_failed -> local fallback")
         return None
@@ -522,6 +527,80 @@ def _pad_short_terms(terms: list[str], context: str) -> list[str]:
                     break
         result.append(term)
     return result
+
+
+def _norm_tokens(text: str) -> list[str]:
+    """Comparison tokens: lowercase, letters and digits only."""
+    return [re.sub(r"[^a-z0-9]", "", w.lower()) for w in text.split()]
+
+
+def _snap_to_source(chunk: str, result: ChunkResult) -> ChunkResult:
+    """Replace each segment's text with the exact span it covers in the source.
+
+    The model is asked for two different things: WHERE a segment breaks, and the
+    text itself. Only the first needs judgement - the second is a lookup, since
+    we are holding the chunk. Trusting the retyped copy let real drift through:
+    on 2026-08-21 live output returned "I wanted to call him and tell it
+    happened" for a line reading "...and tell HIM it happened". One word of
+    someone's prose, gone, with nothing flagged.
+
+    Boundaries come from the model; words come from the writer. Anything that
+    cannot be located in the chunk is left exactly as the model returned it -
+    guessing a span would be its own kind of fabrication.
+    """
+    spans = [(m.start(), m.end()) for m in re.finditer(r"\S+", chunk)]
+    if not spans:
+        return result
+    source = [re.sub(r"[^a-z0-9]", "", chunk[s:e].lower()) for s, e in spans]
+
+    snapped: list[ChunkSegment] = []
+    cursor = 0  # segments arrive in reading order; never match backwards
+    for seg in result.segments:
+        want = [t for t in _norm_tokens(seg.script_text) if t]
+        placed = None
+        if want:
+            matcher = difflib.SequenceMatcher(a=source[cursor:], b=want, autojunk=False)
+            blocks = [b for b in matcher.get_matching_blocks() if b.size]
+            if blocks:
+                first, last = blocks[0], blocks[-1]
+                start_i = cursor + first.a
+                end_i = cursor + last.a + last.size - 1
+                # Only trust the alignment if most of the segment actually landed
+                matched = sum(b.size for b in blocks)
+                if matched >= 0.6 * len(want) and 0 <= start_i <= end_i < len(spans):
+                    placed = chunk[spans[start_i][0]:spans[end_i][1]]
+                    cursor = end_i + 1
+        snapped.append(seg.model_copy(update={"script_text": placed})
+                       if placed else seg)
+    # model_copy, not a fresh ChunkResult: this runs on whatever the provider
+    # layer produced, and re-validating would reject a structurally identical
+    # result whose segments are a sibling model. Snapping text must never be
+    # able to fail a run over a type it did not need to care about.
+    return result.model_copy(update={"segments": snapped})
+
+
+def _normalise_terms(terms: list[str], context: str = "") -> list[str]:
+    """Hold every search term to the prompt's own 2-5 word rule.
+
+    _pad_short_terms only ever fixed the short side, so 6- and 7-word terms
+    reached the UI (8 of 185 in a live run). An over-long query fails for the
+    same reason the full phrases failed on Coverr: the more words a stock search
+    must match, the likelier it matches nothing. Trim from the front, which is
+    where the model puts framing words ("medium", "wide", "close-up of"), and
+    keep the subject.
+    """
+    out: list[str] = []
+    for term in terms:
+        words = term.strip().split()
+        if len(words) > TERM_MAX_WORDS:
+            trimmed = [w for w in words if w.lower() not in _TERM_FRAMING]
+            if len(trimmed) > TERM_MAX_WORDS:
+                trimmed = [w for w in trimmed if w.lower() not in _STOPWORDS]
+            if not TERM_MIN_WORDS <= len(trimmed) <= TERM_MAX_WORDS:
+                trimmed = (trimmed or words)[-TERM_MAX_WORDS:]
+            words = trimmed
+        out.append(" ".join(words))
+    return _pad_short_terms(out, context) if context else out
 
 
 def _fallback_chunk(chunk: str) -> ChunkResult:
@@ -585,7 +664,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
                 if story_map
                 else (draft.search_terms, [])
             )
-            terms = _pad_short_terms(terms, draft.script_text)
+            terms = _normalise_terms(terms, draft.script_text)
             segments.append(
                 Segment(
                     id=len(segments) + 1,
