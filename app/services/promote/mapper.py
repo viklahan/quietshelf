@@ -307,6 +307,27 @@ def _chunk_script(script: str, target_words: int) -> list[str]:
     return chunks or [script.strip()]
 
 
+NARRATION_WPM = 150  # the pace the prompt already assumes
+
+
+def narration_seconds(text: str) -> int:
+    """How long this text takes to narrate, computed - not estimated.
+
+    The prompt asks the model for "integer seconds on screen, from the line
+    length at ~150 wpm", which is arithmetic over script_text we already hold
+    verbatim. Trusting the model's estimate broke the writer's timeline on
+    2026-08-21: its durations overran the chunk's real narration time, the last
+    segment spilled past the next chunk's start offset, and the running order
+    jumped BACKWARDS at every chunk boundary (5:51-6:15 followed by 4:50-5:04).
+
+    Computed, the timeline is continuous by construction: a chunk's segments sum
+    to exactly that chunk's word-time, which IS the next chunk's offset. Same
+    class of rule as never letting the model self-report coverage - if we can
+    calculate it, we calculate it.
+    """
+    return max(1, round(len(text.split()) / NARRATION_WPM * 60))
+
+
 def _mmss(total_seconds: int) -> str:
     minutes, seconds = divmod(max(0, int(total_seconds)), 60)
     return f"{minutes}:{seconds:02d}"
@@ -558,7 +579,7 @@ def map_script(script: str, story_map: StoryMap | None = None) -> ShotList:
         if not title and result.video_title_suggestion.strip():
             title = result.video_title_suggestion.strip()
         for draft in result.segments:
-            duration = max(1, int(draft.clip_duration_seconds))
+            duration = narration_seconds(draft.script_text)
             terms, cast = (
                 _ground_segment(draft.script_text, draft.search_terms, story_map.characters)
                 if story_map

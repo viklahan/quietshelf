@@ -415,3 +415,67 @@ def test_rate_limited_chunk_waits_for_a_window_instead_of_degrading(monkeypatch,
         f"router never waited for a fresh rate-limit window (sleeps: {slept})"
     )
     assert calls["n"] >= 4, "gave up before retrying past the throttle"
+
+
+def test_timeline_never_runs_backwards(client, monkeypatch):
+    """2026-08-21: a writer's timeline read 5:51-6:15 then 4:50-5:04. Segment
+    durations came from the MODEL; when its estimates overran the chunk's real
+    narration time, the last segment spilled past the next chunk's start offset
+    and the timeline jumped backwards at every chunk boundary. Promote exists to
+    give a writer a running order - one that goes back in time is unusable.
+
+    Duration is arithmetic the prompt already defines ("from the line length at
+    ~150 wpm") over script_text we hold verbatim. Computed, not estimated, the
+    timeline is continuous by construction."""
+    from app.services.promote import mapper
+
+    def four_long_segments(system, user, model):
+        from app.services.promote.models import ChunkResult, ChunkSegment
+        lines = [ln for ln in user.split("\n") if ln.strip()] or [user]
+        return ChunkResult(video_title_suggestion="t", segments=[
+            ChunkSegment(script_text=ln,
+                         search_terms=["quiet water dawn", "still lake", "mist reeds"],
+                         # Wildly inflated - exactly the failure being guarded
+                         clip_duration_seconds=90, mood="calm")
+            for ln in lines
+        ])
+
+    monkeypatch.setattr(mapper, "generate_json", four_long_segments)
+    # The STREAM path specifically: /api/promote keeps one running cumulative
+    # across chunks and is monotonic by construction, but the stream emits in
+    # ARRIVAL order and so seeds each chunk from its own precomputed offset -
+    # which is where an overrun spills past the next chunk's start. The UI uses
+    # the stream, so this is the path the writer actually sees.
+    with client.stream("POST", "/api/promote/stream",
+                       json={"script": "A quiet morning by the still water. " * 120}) as r:
+        assert r.status_code == 200
+        raw = "".join(part for part in r.iter_text())
+    buf = {}
+    for line in raw.splitlines():
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            ev = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "chunk":
+            buf[ev["chunk_index"]] = ev["segments"]
+    segs = [seg for idx in sorted(buf) for seg in buf[idx]]   # reading order, as the UI renders
+    assert len(segs) > 1, "test needs a multi-chunk script"
+
+    def secs(mmss):
+        m, s = mmss.split(":")
+        return int(m) * 60 + int(s)
+
+    previous_end = -1
+    for seg in segs:
+        start, end = secs(seg["start_time"]), secs(seg["end_time"])
+        assert start >= previous_end, (
+            f"segment {seg['id']} starts at {seg['start_time']} but the previous "
+            f"segment already ran to {previous_end}s - the timeline went backwards"
+        )
+        assert end >= start
+        previous_end = end

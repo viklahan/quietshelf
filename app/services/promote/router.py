@@ -22,6 +22,8 @@ from app.providers import (
     ProviderRateLimited,
 )
 from app.services.promote.mapper import (
+    NARRATION_WPM,
+    narration_seconds,
     CHUNK_TARGET_WORDS,
     SYSTEM_PROMPT,
     CAST_ADDENDUM,
@@ -167,7 +169,14 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
     # while keeping timestamps correct — no waiting for chunk N-1.
     def _words_before(idx: int) -> int:
         return sum(len(c.split()) for c in chunks[:idx])
-    chunk_offsets = [round(_words_before(i) / 150 * 60) for i in range(total)]
+    # Offsets carried in WORDS, converted to seconds only when a timestamp is
+    # printed. Rounding each segment's duration independently and summing them
+    # drifts against the chunk's own single rounding - about half a second per
+    # segment - so a chunk of eight could still overrun the next chunk's start
+    # and put the running order back in time. One rounding per boundary cannot.
+    chunk_word_offsets = [_words_before(i) for i in range(total)]
+    chunk_offsets = [narration_seconds(' '.join(['w'] * w)) if w else 0
+                     for w in chunk_word_offsets]
 
     logger.info("promote_stream chunks=%d concurrency=%d grounded=%s", total, concurrency, bool(cast_context))
 
@@ -240,10 +249,14 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
             nonlocal title
             if not title and result.video_title_suggestion.strip():
                 title = result.video_title_suggestion.strip()
-            cumulative = chunk_offsets[idx]
+            cumulative_words = chunk_word_offsets[idx]
             segments_out = []
             for draft in result.segments:
-                duration = max(1, int(draft.clip_duration_seconds))
+                seg_words = max(1, len(draft.script_text.split()))
+                start_at = round(cumulative_words / NARRATION_WPM * 60)
+                end_at = round((cumulative_words + seg_words) / NARRATION_WPM * 60)
+                duration = max(1, end_at - start_at)
+                cumulative_words += seg_words
                 terms, cast = (
                     _ground_segment(draft.script_text, draft.search_terms, story_map.characters)
                     if story_map
@@ -254,8 +267,8 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                 seg = Segment(
                     id=segment_id[0],
                     script_text=draft.script_text,
-                    start_time=_mmss(cumulative),
-                    end_time=_mmss(cumulative + duration),
+                    start_time=_mmss(start_at),
+                    end_time=_mmss(start_at + duration),
                     search_terms=terms,
                     clip_duration_seconds=duration,
                     mood=draft.mood,
@@ -263,7 +276,6 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
                     needs_remap=getattr(draft, 'needs_remap', False),
                 )
                 segments_out.append(seg.model_dump())
-                cumulative += duration
             return "data: " + json.dumps({
                 'type': 'chunk', 'chunk_index': idx, 'segments': segments_out,
                 'chunks_done': received, 'total_chunks': total,
