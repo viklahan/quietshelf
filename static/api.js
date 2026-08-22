@@ -183,10 +183,11 @@
 
   // POST /api/promote/stream (SSE) -> yields segments progressively
   // onChunk(segments, chunksD one, totalChunks) called as each chunk arrives
+  // onMeta(evt) called once up front: total_chunks, mappable_words, title
   // onDone(title, runtimeSeconds) called when complete
   // onError(message) called on failure
   // Returns a cleanup function to abort the stream
-  function promoteStream(script, storyMap, { onChunk, onDone, onError }) {
+  function promoteStream(script, storyMap, { onChunk, onDone, onError, onMeta }) {
     let aborted = false;
     let completed = false; // true once we receive the 'done' event
     const ctrl = new AbortController();
@@ -215,7 +216,8 @@
           if (!line.startsWith('data: ')) continue;
           try {
             const evt = JSON.parse(line.slice(6));
-            if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks, evt.chunk_index);
+            if (evt.type === 'meta') { if (onMeta) onMeta(evt); }
+            else if (evt.type === 'chunk') onChunk(evt.segments, evt.chunks_done, evt.total_chunks, evt.chunk_index);
             else if (evt.type === 'done') { completed = true; onDone(evt.title, evt.estimated_runtime_seconds); }
             else if (evt.type === 'error') onError(evt.message);
           } catch (e) { /* malformed line, skip */ }

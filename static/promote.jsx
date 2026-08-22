@@ -168,6 +168,12 @@ function Promote() {
   const [showNarrate, setShowNarrate] = React.useState(false);
   const [mapTitle, setMapTitle] = React.useState('');
   const [remapBusy, setRemapBusy] = React.useState(false);
+  // What the mapper will actually map. NOT the pasted count: the title is
+  // lifted out to become the video title, and [music]/timestamp noise is
+  // dropped. Comparing against the raw paste reported a shortfall that was
+  // never a shortfall - and would have ticked through a real one.
+  const [mappableWords, setMappableWords] = React.useState(0);
+  const [detectedTitle, setDetectedTitle] = React.useState('');
   const [exportOpen, setExportOpen] = React.useState(false);
   const streamCleanupRef = React.useRef(null);
   const chunkBufferRef = React.useRef({});
@@ -302,6 +308,10 @@ function Promote() {
       text,
       grounding,
       {
+        onMeta: function(evt) {
+          setMappableWords(evt.mappable_words || 0);
+          setDetectedTitle(evt.title || '');
+        },
         onChunk: function(newSegs, done, total, chunkIndex) {
           setTotalChunks(total);
           setDoneChunks(done);
@@ -403,22 +413,49 @@ function Promote() {
 
   function remapUnmapped() {
     // Contiguous runs of needs-remap cards; each run was one failed AI chunk.
-    // Remap ONLY those runs — never the whole script again.
+    // Remap ONLY those runs - never the whole script again.
     if (remapBusy) return;
     const runs = [];
     realSegs.forEach(function(s, i) {
       if (s.needsRemap) {
         const last = runs[runs.length - 1];
-        if (last && last.start + last.cards.length === i) last.cards.push(s);
-        else runs.push({ start: i, cards: [s] });
+        if (last && last.a + last.n === i) last.n += 1;
+        else runs.push({ a: i, n: 1 });
       }
     });
     if (!runs.length) return;
-    const eligible = runs.filter(function(r) {
-      return countWords(r.cards.map(function(c) { return c.excerpt; }).join(' ')) >= QS_MIN_WORDS;
+
+    const wordsIn = function(a, b) {
+      return countWords(realSegs.slice(a, b).map(function(c) { return c.excerpt; }).join(' '));
+    };
+
+    // Grow each run outward until it clears the API's 100-word floor. The old
+    // code FILTERED runs that were too short, so a six-word closing line could
+    // never be remapped - the button counted it, promised to fix it, and
+    // silently skipped it forever. Borrowing neighbours costs nothing: they get
+    // remapped too, with more context than they had the first time.
+    const spans = runs.map(function(r) {
+      let a = r.a, b = r.a + r.n;
+      while (wordsIn(a, b) < QS_MIN_WORDS && (a > 0 || b < realSegs.length)) {
+        if (b < realSegs.length) b += 1;
+        else if (a > 0) a -= 1;
+        if (wordsIn(a, b) >= QS_MIN_WORDS) break;
+        if (a > 0) a -= 1;
+      }
+      return { a: a, b: b };
     });
+
+    // Overlapping spans would remap the same cards twice and fight each other.
+    const merged = [];
+    spans.sort(function(x, y) { return x.a - y.a; }).forEach(function(s) {
+      const last = merged[merged.length - 1];
+      if (last && s.a <= last.b) last.b = Math.max(last.b, s.b);
+      else merged.push({ a: s.a, b: s.b });
+    });
+
+    const eligible = merged.filter(function(s) { return wordsIn(s.a, s.b) >= QS_MIN_WORDS; });
     if (!eligible.length) {
-      setError('Those segments are too short to remap on their own \u2014 use \u201cNew piece\u201d to re-run the whole script.');
+      setError('This piece is too short to remap a part of it on its own \u2014 use \u201cNew piece\u201d to re-run the whole script.');
       return;
     }
     setRemapBusy(true);
@@ -426,10 +463,11 @@ function Promote() {
     let ri = 0;
     function nextRun() {
       if (ri >= eligible.length) { setRemapBusy(false); return; }
-      const run = eligible[ri++];
+      const span = eligible[ri++];
+      const cards = realSegs.slice(span.a, span.b);
       // Sacrificial first line: the mapper's title detector absorbs it, so the
       // run's real first beat can never be eaten as a "title".
-      const joined = 'Remap pass\n\n' + run.cards.map(function(c) { return c.excerpt; }).join('\n');
+      const joined = 'Remap pass\n\n' + cards.map(function(c) { return c.excerpt; }).join('\n');
       const buffer = {};
       window.QS_API.promoteStream(joined, null, {
         onChunk: function(newSegs, _d, _t, chunkIndex) { buffer[chunkIndex] = newSegs.map(toCard); },
@@ -439,12 +477,13 @@ function Promote() {
             .forEach(function(k) { buffer[k].forEach(function(c) { fresh.push(c); }); });
           if (fresh.length) {
             setSegs(function(prev) {
-              // Locate the run by its first card (indices may have shifted)
-              const at = prev.findIndex(function(s) { return s.needsRemap && s.excerpt === run.cards[0].excerpt; });
+              // Locate the span by its first card's text (indices may have shifted)
+              const at = prev.findIndex(function(s) { return s.excerpt === cards[0].excerpt; });
               if (at === -1) return prev;
-              const out = prev.slice(0, at).concat(fresh, prev.slice(at + run.cards.length));
+              const out = prev.slice(0, at).concat(fresh, prev.slice(at + cards.length));
               out.forEach(function(c, i) { c.index = i + 1; });
-              saveLastResult({ segs: out, groundedBy: groundedBy, found: found });
+              saveLastResult({ segs: out.filter(function(c) { return !c.pending; }),
+                               groundedBy: groundedBy, found: found });
               return out;
             });
           }
@@ -588,9 +627,12 @@ function Promote() {
           <span className="qs-mapline__count">{String(doneCount).padStart(2, '0')} of {String(realSegs.length).padStart(2, '0')} mapped</span>
           {mappedWords > 0 && inputWordCount > 0 ? (
             <span className="qs-quiethint" style={{ marginLeft: 'var(--space-3)' }}>
-              {'· '}{mappedWords.toLocaleString()} of {inputWordCount.toLocaleString()} words covered
+              {'· '}{mappedWords.toLocaleString()} of {(mappableWords || inputWordCount).toLocaleString()} words covered
               {isLoading ? null
-                : mappedWords < inputWordCount * 0.95 ? ' ⚠️ incomplete' : ' ✓'}
+                : mappedWords < (mappableWords || inputWordCount) ? ' ⚠️ incomplete' : ' ✓'}
+              {!isLoading && detectedTitle ? (
+                <span> {'· title: “'}{detectedTitle}{'”'}</span>
+              ) : null}
             </span>
           ) : null}
           {isLoading ? (

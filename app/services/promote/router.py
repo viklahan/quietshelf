@@ -241,7 +241,15 @@ def promote_stream(body: PromoteRequest, request: Request, _: None = Depends(gua
         received = 0
         segment_id = [0]  # mutable counter via list
 
-        yield f"data: {json.dumps({'type': 'meta', 'total_chunks': total})}\n\n"
+        # mappable_words is what the chunker will actually map - NOT the pasted
+        # word count. _clean_transcript lifts the title out (it becomes the video
+        # title) and drops [music] tags and timestamp lines. The UI compared
+        # coverage against the RAW paste, so a piece with an 8-word title read
+        # "828 of 836 words covered" and still showed a tick: a shortfall that was
+        # never a shortfall, beside a tick that would have hidden a real one.
+        mappable_words = sum(len(c.split()) for c in chunks)
+        yield f"data: {json.dumps({'type': 'meta', 'total_chunks': total, 'mappable_words': mappable_words, 'title': detected_title})}\n\n"
+
 
         def render(idx: int, result) -> str:
             """Turn one mapped chunk into its SSE line. Shared by the normal
